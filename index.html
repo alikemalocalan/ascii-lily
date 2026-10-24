@@ -14,17 +14,22 @@
       padding: 0;
     }
 
-    body {
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
       background-color: #000000;
       color: #ffffff;
       font-family: 'JetBrains Mono', monospace;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
       display: flex;
       align-items: center;
       justify-content: center;
-      user-select: none;
     }
 
     #ascii-canvas {
@@ -34,9 +39,10 @@
       height: 100vh;
       background: #000000;
       display: block;
+      touch-action: none;
     }
 
-    /* Minimal floating controls - auto-hide */
+    /* Minimal floating controls - auto-hide on desktop, NEVER on mobile */
     .controls {
       position: fixed;
       bottom: 24px;
@@ -60,6 +66,15 @@
     .controls:hover,
     .controls.active {
       opacity: 1;
+    }
+
+    /* Hide controls on mobile / portrait / touch devices - completely clean animation */
+    @media (max-width: 860px), (orientation: portrait), (hover: none) and (pointer: coarse) {
+      .controls {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
     }
 
     .btn {
@@ -221,18 +236,6 @@
     img2.src = "clara_2_growing.png";  // Stage 2: Eyes half open looking right, warm smile, olive branch wrapping hair
     img3.src = "clara_3_crown.png";    // Stage 3: Eyes wide open clear blue looking right, radiant smile, full Roman olive wreath crown
 
-    function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      ctx.scale(dpr, dpr);
-
-      vCanvas.width = CONFIG.baseW;
-      vCanvas.height = CONFIG.baseH;
-    }
-    window.addEventListener("resize", resize);
-    resize();
-
     // Floating background stars and drifting fragrant petals
     const sparkles = [];
     for (let i = 0; i < CONFIG.numSparkles; i++) {
@@ -247,6 +250,40 @@
         baseColor: Math.random() > 0.4 ? "rgba(255, 235, 190, " : "rgba(216, 243, 220, "
       });
     }
+
+    let isPortrait = false;
+
+    function resize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      isPortrait = h > w;
+
+      if (isPortrait) {
+        CONFIG.baseW = 800;
+        CONFIG.baseH = 1400;
+      } else {
+        CONFIG.baseW = 1600;
+        CONFIG.baseH = 1000;
+      }
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      vCanvas.width = CONFIG.baseW;
+      vCanvas.height = CONFIG.baseH;
+
+      if (sparkles && sparkles.length > 0) {
+        sparkles.forEach(s => {
+          s.x = Math.random() * CONFIG.baseW;
+          s.y = Math.random() * CONFIG.baseH;
+        });
+      }
+    }
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", () => setTimeout(resize, 100));
+    resize();
 
     // --- 8 ASIATIC LILIES (SYNCHRONIZED BLOOM TIMELINE) ---
     // Bloom durations aligned so opening starts from buds and reaches full glory together
@@ -442,24 +479,22 @@
     }
 
     // --- DRAW CLARA (SYNCHRONIZED EYE OPENING, SMILING & OLIVE CROWN SPROUTING) ---
-    function drawClara(v, progress, tTime) {
+    function drawClara(v, progress, tTime, cX, cY, cW, cH) {
       if (imagesLoaded < 4) return;
 
-      const cX = 35;
-      const cY = 140;
-      const cW = 730;
-      const cH = 730;
+      cX = cX !== undefined ? cX : 35;
+      cY = cY !== undefined ? cY : 140;
+      cW = cW || 730;
+      cH = cH || 730;
 
       // Organic subtle breathing movement
       const breathY = Math.sin(tTime * 1.5) * 2.5;
 
       v.save();
       v.translate(cX, cY + breathY);
+      v.filter = "brightness(1.24) contrast(1.26) saturate(1.18)";
 
       // Smooth, 4-stage progression across the entire animation (100% in sync with lilies):
-      // 0.00 -> 0.333: closed -> sprout (eyes gently crack open, smile begins, olive shoot peeks out of hair)
-      // 0.333 -> 0.666: sprout -> growing (eyes open halfway, warm smile, olive branch wraps across hair)
-      // 0.666 -> 1.000: growing -> crown (eyes open fully clear blue, radiant smile, full Roman olive wreath crown)
       if (progress <= 0.333) {
         const t = easeInOutCubic(progress / 0.333);
         v.drawImage(img0, 0, 0, cW, cH);
@@ -489,6 +524,8 @@
         }
       }
 
+      v.filter = "none";
+
       // Delicate golden-olive stardust halo that grows naturally with the olive crown
       if (progress > 0.10) {
         const haloStrength = Math.min(1.0, (progress - 0.10) / 0.90);
@@ -496,7 +533,7 @@
         v.fillStyle = `rgba(183, 228, 199, ${haloStrength * 0.35})`;
         for (let b = 0; b < 20; b++) {
           const angle = (b / 20) * Math.PI * 2 + tTime * 1.6;
-          const rad = 230 + Math.sin(b * 3.1 + tTime * 2.2) * 22;
+          const rad = (cW * 0.315) + Math.sin(b * 3.1 + tTime * 2.2) * (cW * 0.03);
           const bx = cW * 0.52 + Math.cos(angle) * rad;
           const by = cH * 0.30 + Math.sin(angle) * (rad * 0.55);
           v.beginPath();
@@ -513,7 +550,7 @@
     function drawVectorScene(v, progress, tTime) {
       v.clearRect(0, 0, CONFIG.baseW, CONFIG.baseH);
 
-      // 1. Dynamic Celestial Aurora ("arada arka plan renkleri de güzelleşsin")
+      // 1. Dynamic Celestial Aurora
       const bloomGlow = Math.min(1.0, progress * 1.15);
 
       // Deep celestial nebula background
@@ -524,56 +561,122 @@
       v.fillStyle = bgGrad;
       v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
 
-      // Warm romantic glow behind Bouquet (right side)
-      if (bloomGlow > 0.01) {
-        const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
-        const rgBouquet = v.createRadialGradient(1140, 500, 50 * pulse, 1140, 500, 560 * pulse);
-        rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.32 * bloomGlow})`);
-        rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.24 * bloomGlow})`);
-        rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.15 * bloomGlow})`);
-        rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+      if (isPortrait) {
+        // ==========================================
+        // MOBILE PORTRAIT COMPOSITION (Top: Clara, Bottom: Lilies)
+        // ==========================================
+        const cSize = 640;
+        const cX = (CONFIG.baseW - cSize) * 0.5 - 15;
+        const cY = 25;
 
-        v.fillStyle = rgBouquet;
-        v.fillRect(520, 0, 1080, CONFIG.baseH);
-      }
-
-      // Ethereal emerald-gold aura behind Clara (left side)
-      if (bloomGlow > 0.01) {
-        const pulseC = 1 + Math.cos(tTime * 1.8) * 0.03;
-        const rgClara = v.createRadialGradient(390, 380, 40 * pulseC, 390, 380, 460 * pulseC);
-        rgClara.addColorStop(0.0, `rgba(116, 198, 157, ${0.30 * bloomGlow})`);
-        rgClara.addColorStop(0.38, `rgba(255, 225, 90, ${0.18 * bloomGlow})`);
-        rgClara.addColorStop(0.75, `rgba(25, 85, 95, ${0.10 * bloomGlow})`);
-        rgClara.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-
-        v.fillStyle = rgClara;
-        v.fillRect(0, 0, 850, CONFIG.baseH);
-      }
-
-      // 2. Render Clara on the Left Side
-      drawClara(v, progress, tTime);
-
-      // 3. Render Bouquet on the Right Side (Translated to x: 670, y: -20)
-      v.save();
-      v.translate(670, -20);
-      drawBouquetElements(v, progress, tTime);
-      v.restore();
-
-      // 4. Drifting Golden Pollen & Stardust from Flowers towards Clara
-      if (progress > 0.15) {
-        const pollenCount = Math.floor(progress * 28);
-        v.save();
-        for (let p = 0; p < pollenCount; p++) {
-          const pSeed = p * 137.5;
-          const px = ((CONFIG.baseW - (tTime * 45 + pSeed * 10) % CONFIG.baseW) + CONFIG.baseW) % CONFIG.baseW;
-          const py = 250 + Math.sin(tTime * 1.4 + p) * 120 + ((p * 73) % 400);
-          const pAlpha = (0.3 + 0.7 * Math.sin(tTime * 2.5 + p)) * Math.min(1.0, (progress - 0.15) / 0.4);
-          v.fillStyle = p % 2 === 0 ? `rgba(255, 215, 0, ${pAlpha * 0.6})` : `rgba(216, 243, 220, ${pAlpha * 0.5})`;
-          v.beginPath();
-          v.arc(px, py, 1.2 + (p % 3) * 0.6, 0, Math.PI * 2);
-          v.fill();
+        // Ethereal emerald-gold aura behind Clara (top)
+        if (bloomGlow > 0.01) {
+          const pulseC = 1 + Math.cos(tTime * 1.8) * 0.03;
+          const rgClara = v.createRadialGradient(CONFIG.baseW * 0.5, cY + cSize * 0.40, 40 * pulseC, CONFIG.baseW * 0.5, cY + cSize * 0.40, 420 * pulseC);
+          rgClara.addColorStop(0.0, `rgba(116, 198, 157, ${0.35 * bloomGlow})`);
+          rgClara.addColorStop(0.38, `rgba(255, 225, 90, ${0.22 * bloomGlow})`);
+          rgClara.addColorStop(0.75, `rgba(25, 85, 95, ${0.12 * bloomGlow})`);
+          rgClara.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+          v.fillStyle = rgClara;
+          v.fillRect(0, 0, CONFIG.baseW, 700);
         }
+
+        // Warm romantic glow behind Bouquet (bottom)
+        const bouquetScale = 0.86;
+        const bouquetX = (CONFIG.baseW - 920 * bouquetScale) * 0.5;
+        const bouquetY = 530;
+
+        if (bloomGlow > 0.01) {
+          const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
+          const rgBouquet = v.createRadialGradient(CONFIG.baseW * 0.5, bouquetY + 540 * bouquetScale, 50 * pulse, CONFIG.baseW * 0.5, bouquetY + 540 * bouquetScale, 520 * pulse);
+          rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.36 * bloomGlow})`);
+          rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.26 * bloomGlow})`);
+          rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.16 * bloomGlow})`);
+          rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+          v.fillStyle = rgBouquet;
+          v.fillRect(0, 600, CONFIG.baseW, 800);
+        }
+
+        // 2. Render Clara at Top
+        drawClara(v, progress, tTime, cX, cY, cSize, cSize);
+
+        // 3. Render Bouquet at Bottom
+        v.save();
+        v.translate(bouquetX, bouquetY);
+        v.scale(bouquetScale, bouquetScale);
+        drawBouquetElements(v, progress, tTime);
         v.restore();
+
+        // 4. Drifting Golden Pollen & Stardust from Flowers up to Clara
+        if (progress > 0.15) {
+          const pollenCount = Math.floor(progress * 30);
+          v.save();
+          for (let p = 0; p < pollenCount; p++) {
+            const pSeed = p * 137.5;
+            const py = ((CONFIG.baseH - (tTime * 48 + pSeed * 8) % CONFIG.baseH) + CONFIG.baseH) % CONFIG.baseH;
+            const px = (CONFIG.baseW * 0.5) + Math.sin(tTime * 1.5 + p) * (CONFIG.baseW * 0.38);
+            const pAlpha = (0.3 + 0.7 * Math.sin(tTime * 2.5 + p)) * Math.min(1.0, (progress - 0.15) / 0.4);
+            v.fillStyle = p % 2 === 0 ? `rgba(255, 215, 0, ${pAlpha * 0.65})` : `rgba(216, 243, 220, ${pAlpha * 0.55})`;
+            v.beginPath();
+            v.arc(px, py, 1.4 + (p % 3) * 0.6, 0, Math.PI * 2);
+            v.fill();
+          }
+          v.restore();
+        }
+
+      } else {
+        // ==========================================
+        // DESKTOP LANDSCAPE COMPOSITION (Side-by-side)
+        // ==========================================
+        // Warm romantic glow behind Bouquet (right side)
+        if (bloomGlow > 0.01) {
+          const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
+          const rgBouquet = v.createRadialGradient(1140, 500, 50 * pulse, 1140, 500, 560 * pulse);
+          rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.32 * bloomGlow})`);
+          rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.24 * bloomGlow})`);
+          rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.15 * bloomGlow})`);
+          rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+          v.fillStyle = rgBouquet;
+          v.fillRect(520, 0, 1080, CONFIG.baseH);
+        }
+
+        // Ethereal emerald-gold aura behind Clara (left side)
+        if (bloomGlow > 0.01) {
+          const pulseC = 1 + Math.cos(tTime * 1.8) * 0.03;
+          const rgClara = v.createRadialGradient(390, 380, 40 * pulseC, 390, 380, 460 * pulseC);
+          rgClara.addColorStop(0.0, `rgba(116, 198, 157, ${0.30 * bloomGlow})`);
+          rgClara.addColorStop(0.38, `rgba(255, 225, 90, ${0.18 * bloomGlow})`);
+          rgClara.addColorStop(0.75, `rgba(25, 85, 95, ${0.10 * bloomGlow})`);
+          rgClara.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+          v.fillStyle = rgClara;
+          v.fillRect(0, 0, 850, CONFIG.baseH);
+        }
+
+        // 2. Render Clara on the Left Side
+        drawClara(v, progress, tTime, 35, 140, 730, 730);
+
+        // 3. Render Bouquet on the Right Side
+        v.save();
+        v.translate(670, -20);
+        drawBouquetElements(v, progress, tTime);
+        v.restore();
+
+        // 4. Drifting Golden Pollen & Stardust from Flowers towards Clara
+        if (progress > 0.15) {
+          const pollenCount = Math.floor(progress * 28);
+          v.save();
+          for (let p = 0; p < pollenCount; p++) {
+            const pSeed = p * 137.5;
+            const px = ((CONFIG.baseW - (tTime * 45 + pSeed * 10) % CONFIG.baseW) + CONFIG.baseW) % CONFIG.baseW;
+            const py = 250 + Math.sin(tTime * 1.4 + p) * 120 + ((p * 73) % 400);
+            const pAlpha = (0.3 + 0.7 * Math.sin(tTime * 2.5 + p)) * Math.min(1.0, (progress - 0.15) / 0.4);
+            v.fillStyle = p % 2 === 0 ? `rgba(255, 215, 0, ${pAlpha * 0.6})` : `rgba(216, 243, 220, ${pAlpha * 0.5})`;
+            v.beginPath();
+            v.arc(px, py, 1.2 + (p % 3) * 0.6, 0, Math.PI * 2);
+            v.fill();
+          }
+          v.restore();
+        }
       }
     }
 
@@ -1113,16 +1216,34 @@
     }
 
     // --- MAIN RENDER LOOP ---
+    let holdTimer = 0;
+
     function render() {
       if (isPlaying) {
         bloomProgress += CONFIG.bloomSpeed;
-        if (bloomProgress > 1.0) {
+        if (bloomProgress >= 1.0) {
           bloomProgress = 1.0;
-          isPlaying = false;
-          updateIcons();
+          if (isPortrait) {
+            // Mobile: hold full bloom for ~3.5s (210 frames), then softly auto-loop
+            holdTimer++;
+            if (holdTimer > 210) {
+              bloomProgress = 0.0;
+              holdTimer = 0;
+            }
+          } else {
+            isPlaying = false;
+            updateIcons();
+          }
+        } else {
+          holdTimer = 0;
         }
-        document.getElementById("bloom-slider").value = bloomProgress;
-        document.getElementById("bloom-val").innerText = `${Math.round(bloomProgress * 100)}%`;
+
+        if (!isPortrait) {
+          const sEl = document.getElementById("bloom-slider");
+          const lEl = document.getElementById("bloom-val");
+          if (sEl) sEl.value = bloomProgress;
+          if (lEl) lEl.innerText = `${Math.round(bloomProgress * 100)}%`;
+        }
       }
       time += CONFIG.windSpeed;
 
@@ -1138,11 +1259,11 @@
       // 3. Grid sizing for ASCII conversion
       const chars = ASCII_RAMP;
       const charLen = chars.length;
-      const fontSize = CONFIG.fontSize;
+      const fontSize = isPortrait ? 4.5 : CONFIG.fontSize;
       const charW = fontSize * CONFIG.charAspect;
       const charH = fontSize;
 
-      const scale = Math.min((w * 0.96) / CONFIG.baseW, (h * 0.96) / CONFIG.baseH);
+      const scale = isPortrait ? Math.max(w / CONFIG.baseW, h / CONFIG.baseH) : Math.min((w * 0.96) / CONFIG.baseW, (h * 0.96) / CONFIG.baseH);
       const sceneW = CONFIG.baseW * scale;
       const sceneH = CONFIG.baseH * scale;
       const offX = (w - sceneW) * 0.5;
@@ -1154,7 +1275,7 @@
       const imgData = vCtx.getImageData(0, 0, CONFIG.baseW, CONFIG.baseH);
       const data = imgData.data;
 
-      ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
+      ctx.font = `${fontSize}px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace`;
       ctx.textBaseline = "top";
 
       // 4. Background ASCII Stars & Drifting Floral Petals
@@ -1175,47 +1296,48 @@
         }
       });
 
-      // 5. Draw Scene in Colored ASCII Characters
+      // 5. Draw Scene in Colored ASCII Characters (Fast optimized pass)
       for (let r = 0; r < rows; r++) {
         const sampleY = Math.floor((r / rows) * CONFIG.baseH);
         const drawY = offY + r * charH;
+        const rowOffset = sampleY * CONFIG.baseW;
 
         for (let c = 0; c < cols; c++) {
           const sampleX = Math.floor((c / cols) * CONFIG.baseW);
-          const drawX = offX + c * charW;
+          const idx = (rowOffset + sampleX) * 4;
 
-          const idx = (sampleY * CONFIG.baseW + sampleX) * 4;
+          const alphaByte = data[idx + 3];
+          if (alphaByte < 12) continue; // Fast skip empty/transparent pixels
+
           const red = data[idx];
           const green = data[idx + 1];
           const blue = data[idx + 2];
-          const alpha = data[idx + 3] / 255;
 
-          if (alpha > 0.04) {
-            const maxVal = Math.max(red, green, blue);
-            const avgVal = (red + green + blue) / 3;
+          const maxVal = Math.max(red, green, blue);
+          if (maxVal < 14) continue; // Cut off noise in pure black background
 
-            // Cut off noise in pure black background
-            if (maxVal < 14) continue;
+          const drawX = offX + c * charW;
+          const avgVal = (red + green + blue) / 3;
+          const alpha = alphaByte / 255;
 
-            const intensity = Math.min(1.0, (avgVal * 0.35 + maxVal * 0.65) / 235);
-            const charIdx = Math.min(charLen - 1, Math.floor(intensity * charLen));
-            const char = chars[charIdx];
+          const intensity = Math.min(1.0, (avgVal * 0.35 + maxVal * 0.65) / 235);
+          const charIdx = Math.min(charLen - 1, Math.floor(intensity * charLen));
+          const char = chars[charIdx];
 
-            // Subtle color saturation enhancement
-            const boostR = Math.min(255, Math.floor(red * 1.22));
-            const boostG = Math.min(255, Math.floor(green * 1.22));
-            const boostB = Math.min(255, Math.floor(blue * 1.22));
+          // Subtle color saturation enhancement
+          const boostR = Math.min(255, Math.floor(red * 1.22));
+          const boostG = Math.min(255, Math.floor(green * 1.22));
+          const boostB = Math.min(255, Math.floor(blue * 1.22));
 
-            ctx.fillStyle = `rgba(${boostR}, ${boostG}, ${boostB}, ${Math.min(1.0, alpha * 1.35)})`;
-            ctx.fillText(char, drawX, drawY);
-          }
+          ctx.fillStyle = `rgba(${boostR}, ${boostG}, ${boostB}, ${Math.min(1.0, alpha * 1.35)})`;
+          ctx.fillText(char, drawX, drawY);
         }
       }
 
       requestAnimationFrame(render);
     }
 
-    // --- INTERACTIVE UI CONTROLS ---
+    // --- INTERACTIVE UI CONTROLS (DESKTOP) ---
     const btnPlay = document.getElementById("btn-play");
     const btnRestart = document.getElementById("btn-restart");
     const slider = document.getElementById("bloom-slider");
@@ -1224,6 +1346,7 @@
     const iconPause = document.getElementById("icon-pause");
 
     function updateIcons() {
+      if (!iconPlay || !iconPause) return;
       if (isPlaying) {
         iconPlay.style.display = "none";
         iconPause.style.display = "block";
@@ -1233,32 +1356,53 @@
       }
     }
 
-    btnPlay.addEventListener("click", () => {
-      if (bloomProgress >= 1.0) bloomProgress = 0.0;
-      isPlaying = !isPlaying;
-      updateIcons();
-    });
+    if (btnPlay) {
+      btnPlay.addEventListener("click", () => {
+        if (bloomProgress >= 1.0) bloomProgress = 0.0;
+        isPlaying = !isPlaying;
+        updateIcons();
+      });
+    }
 
-    btnRestart.addEventListener("click", () => {
-      bloomProgress = 0.0;
-      isPlaying = true;
-      updateIcons();
-    });
+    if (btnRestart) {
+      btnRestart.addEventListener("click", () => {
+        bloomProgress = 0.0;
+        isPlaying = true;
+        updateIcons();
+      });
+    }
 
-    slider.addEventListener("input", (e) => {
-      isPlaying = false;
-      bloomProgress = parseFloat(e.target.value);
-      label.innerText = `${Math.round(bloomProgress * 100)}%`;
-      updateIcons();
-    });
+    if (slider) {
+      slider.addEventListener("input", (e) => {
+        isPlaying = false;
+        bloomProgress = parseFloat(e.target.value);
+        if (label) label.innerText = `${Math.round(bloomProgress * 100)}%`;
+        updateIcons();
+      });
+    }
 
     window.setBloom = function(val) {
       isPlaying = false;
       bloomProgress = val;
-      slider.value = val;
-      label.innerText = `${Math.round(val * 100)}%`;
+      if (slider) slider.value = val;
+      if (label) label.innerText = `${Math.round(val * 100)}%`;
       updateIcons();
     };
+
+    // --- CLEAN MOBILE TOUCH INTERACTION ---
+    // Tap screen anywhere to restart if finished, or toggle play/pause
+    window.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest(".controls")) return;
+      if (isPortrait) {
+        if (bloomProgress >= 0.95) {
+          bloomProgress = 0.0;
+          holdTimer = 0;
+          isPlaying = true;
+        } else {
+          isPlaying = !isPlaying;
+        }
+      }
+    });
 
     updateIcons();
     requestAnimationFrame(render);
