@@ -215,10 +215,11 @@
     img2.onload = onImgLoad;
     img3.onload = onImgLoad;
 
-    img0.src = "clara_0_closed.jpg";   // Stage 0: Natural hair, closed eyes, calm lips, no hat, no crown
-    img1.src = "clara_1_sprout.jpg";   // Stage 1: Eyes cracking open, soft smile starting, olive shoot peeking out
-    img2.src = "clara_2_growing.jpg";  // Stage 2: Eyes half open looking right, warm smile, olive branch wrapping hair
-    img3.src = "clara_3_crown.jpg";    // Stage 3: Eyes wide open clear blue looking right, radiant smile, full Roman olive wreath crown
+    // Transparent PNG stages with NO black background
+    img0.src = "clara_0_closed.png";   // Stage 0: Natural hair, closed eyes, calm lips, no hat, no crown
+    img1.src = "clara_1_sprout.png";   // Stage 1: Eyes cracking open, soft smile starting, olive shoot peeking out
+    img2.src = "clara_2_growing.png";  // Stage 2: Eyes half open looking right, warm smile, olive branch wrapping hair
+    img3.src = "clara_3_crown.png";    // Stage 3: Eyes wide open clear blue looking right, radiant smile, full Roman olive wreath crown
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
