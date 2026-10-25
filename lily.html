@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>ASCII Lily Bouquet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #000000;
+      color: #ffffff;
+      font-family: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, ui-monospace, SFMono-Regular, monospace;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #ascii-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background: #000000;
+      display: block;
+      touch-action: none;
+    }
+
+    /* Minimal floating controls - auto-hide on desktop, NEVER on mobile */
+    .controls {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(16, 16, 18, 0.8);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 18px;
+      border-radius: 30px;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+    }
+
+    body:hover .controls,
+    .controls:hover,
+    .controls.active {
+      opacity: 1;
+    }
+
+    /* Hide controls on mobile / portrait / touch devices - completely clean animation */
+    @media (max-width: 860px), (orientation: portrait), (hover: none) and (pointer: coarse) {
+      .controls {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+    }
+
+    .btn {
+      background: transparent;
+      border: none;
+      color: #d0d0d0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 220px;
+    }
+
+    .slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff3366;
+      box-shadow: 0 0 10px #ff3366;
+      cursor: pointer;
+    }
+
+    .label {
+      font-size: 0.7rem;
+      color: #999999;
+      min-width: 32px;
+      font-family: inherit;
+    }
+
+    .tag-btn {
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      color: #cccccc;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tag-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="ascii-canvas"></canvas>
+
+  <div class="controls" id="controls">
+    <button class="btn" id="btn-play" title="Play / Pause">
+      <svg id="icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <svg id="icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+      </svg>
+    </button>
+    <button class="btn" id="btn-replay" title="Replay Bloom">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 4v6h6M23 20v-6h-6"/>
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+      </svg>
+    </button>
+    <div class="slider-wrap">
+      <input type="range" id="bloom-slider" class="slider" min="0" max="1" step="0.001" value="0">
+      <span class="label" id="bloom-val">0%</span>
+    </div>
+    <button class="tag-btn" id="btn-res">HD</button>
+  </div>
+
+  <script>
+    /**
+     * PROCEDURAL ASCII LILY BOUQUET
+     * Exact simulation of the viral video flower bouquet:
+     * - 8 distinct Asiatic Lilies with long lanceolate pointed petals
+     * - Vibrant saturated chromatic ASCII shading (solid density for reds, pinks, yellows)
+     * - Dense fan of stems, foliage leaves, and ornamental wheat stalks
+     * - Growth -> Buds -> Star bloom animation with organic wind sway
+     */
+
+    const CONFIG = {
+      baseW: 920,
+      baseH: 1100,
+      fontSize: 5.6,     // High-density ASCII matrix
+      charAspect: 0.58,  // Courier / JetBrains Mono aspect ratio
+      bloomSpeed: 0.009,  // 3x faster animation
+      windSpeed: 0.0036,
+      numSparkles: 85
+    };
+
+    // Shading ramp from light to dense
+    const ASCII_RAMP = "   ..::--++==**##%%@@";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let bloomProgress = urlParams.has("bloom") ? parseFloat(urlParams.get("bloom")) : 0.0;
+    let isPlaying = urlParams.has("play") ? urlParams.get("play") === "1" : !urlParams.has("bloom");
+    let autoLoop = urlParams.get("loop") === "1";
+    let time = 0;
+
+    const canvas = document.getElementById("ascii-canvas");
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    // Vector rendering buffer
+    const vCanvas = document.createElement("canvas");
+    const vCtx = vCanvas.getContext("2d", { willReadFrequently: true });
+
+    // Floating background stars
+    const sparkles = [];
+    for (let i = 0; i < CONFIG.numSparkles; i++) {
+      sparkles.push({
+        x: Math.random() * CONFIG.baseW,
+        y: Math.random() * CONFIG.baseH,
+        char: ["*", "✦", "+", "·", ".", "⋆"][Math.floor(Math.random() * 6)],
+        speed: 0.08 + Math.random() * 0.22,
+        twinkleSpeed: 0.02 + Math.random() * 0.05,
+        offset: Math.random() * Math.PI * 2,
+        color: Math.random() > 0.3 ? "rgba(255, 255, 255, " : "rgba(255, 235, 190, "
+      });
+    }
+
+    let dpr = 1;
+    let cssW = window.innerWidth || 920;
+    let cssH = window.innerHeight || 1100;
+    let isPortrait = false;
+
+    function resize() {
+      cssW = window.innerWidth || document.documentElement.clientWidth || screen.width || 390;
+      cssH = window.innerHeight || document.documentElement.clientHeight || screen.height || 844;
+      if (!cssW || isNaN(cssW) || cssW <= 0) cssW = 390;
+      if (!cssH || isNaN(cssH) || cssH <= 0) cssH = 844;
+      isPortrait = cssH > cssW;
+
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      vCanvas.width = CONFIG.baseW;
+      vCanvas.height = CONFIG.baseH;
+
+      if (sparkles && sparkles.length > 0) {
+        sparkles.forEach(s => {
+          s.x = Math.random() * CONFIG.baseW;
+          s.y = Math.random() * CONFIG.baseH;
+        });
+      }
+    }
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", () => setTimeout(resize, 100));
+    window.addEventListener("pageshow", resize);
+    resize();
+
+    // --- 8 LILIES (EXACT REPLICA FROM VIDEO) ---
+    const LILIES = [
+      // 1. Center Red Lily (Large, dominant, facing forward)
+      {
+        id: "center-red",
+        x: 460, y: 440,
+        scale: 1.88,
+        tilt: -0.04,
+        bloomStart: 0.20, bloomDuration: 0.50,
+        stemStartX: 460, stemStartY: 1000,
+        c1: { x: 462, y: 780 }, c2: { x: 458, y: 580 },
+        palette: {
+          throat: "#ffe066", throatGreen: "#38b000",
+          base: "#9e002d", mid: "#e6194b", tip: "#ff3366", edge: "#ff758f",
+          spots: "#4a0011", stamen: "#ff0054", anther: "#ffb703"
+        }
+      },
+      // 2. Lower Left Pink / Magenta Lily (Vivid rose pink Asiatic Lily)
+      {
+        id: "lower-left-pink",
+        x: 325, y: 650,
+        scale: 1.82,
+        tilt: -0.28,
+        bloomStart: 0.26, bloomDuration: 0.48,
+        stemStartX: 445, stemStartY: 1000,
+        c1: { x: 400, y: 820 }, c2: { x: 345, y: 740 },
+        palette: {
+          throat: "#70e000", throatGreen: "#38b000",
+          base: "#7209b7", mid: "#c77dff", tip: "#ff499e", edge: "#ffc2d1",
+          spots: "#3a0ca3", stamen: "#ff4d6d", anther: "#ffb703"
+        }
+      },
+      // 3. Lower Right Pearl White Lily (Shimmering ivory/cream blossom)
+      {
+        id: "lower-right-white",
+        x: 595, y: 660,
+        scale: 1.84,
+        tilt: 0.25,
+        bloomStart: 0.30, bloomDuration: 0.48,
+        stemStartX: 475, stemStartY: 1000,
+        c1: { x: 510, y: 820 }, c2: { x: 565, y: 750 },
+        palette: {
+          throat: "#95d5b2", throatGreen: "#40916c",
+          base: "#d8f3dc", mid: "#f8f9fa", tip: "#ffffff", edge: "#ffffff",
+          spots: "#52b788", stamen: "#95d5b2", anther: "#bc6c25"
+        }
+      },
+      // 4. Upper Left Silver-White Lily (Peeking behind red lily at 10 o'clock)
+      {
+        id: "upper-left-white",
+        x: 295, y: 390,
+        scale: 1.55,
+        tilt: -0.40,
+        bloomStart: 0.34, bloomDuration: 0.46,
+        stemStartX: 440, stemStartY: 1000,
+        c1: { x: 370, y: 720 }, c2: { x: 310, y: 520 },
+        palette: {
+          throat: "#74c69d", throatGreen: "#2d6a4f",
+          base: "#ced4da", mid: "#e9ecef", tip: "#ffffff", edge: "#f8f9fa",
+          spots: "#40916c", stamen: "#74c69d", anther: "#a68a64"
+        }
+      },
+      // 5. Top Center Peach / Copper Lily (Facing upward at 12 o'clock)
+      {
+        id: "top-peach",
+        x: 465, y: 280,
+        scale: 1.52,
+        tilt: 0.02,
+        bloomStart: 0.38, bloomDuration: 0.46,
+        stemStartX: 460, stemStartY: 1000,
+        c1: { x: 465, y: 680 }, c2: { x: 465, y: 440 },
+        palette: {
+          throat: "#d4a373", throatGreen: "#55a630",
+          base: "#a663cc", mid: "#ddb892", tip: "#fefae0", edge: "#ffffff",
+          spots: "#7f4f24", stamen: "#b08968", anther: "#6b705c"
+        }
+      },
+      // 6. Top Right Golden Yellow Lily (At 1-2 o'clock)
+      {
+        id: "top-right-yellow",
+        x: 640, y: 380,
+        scale: 1.58,
+        tilt: 0.36,
+        bloomStart: 0.40, bloomDuration: 0.46,
+        stemStartX: 475, stemStartY: 1000,
+        c1: { x: 530, y: 720 }, c2: { x: 610, y: 520 },
+        palette: {
+          throat: "#aacc00", throatGreen: "#38b000",
+          base: "#ee9b00", mid: "#f9c74f", tip: "#ffea00", edge: "#fff3b0",
+          spots: "#99582a", stamen: "#ee9b00", anther: "#780000"
+        }
+      },
+      // 7. Mid Right Deep Burgundy Lily (At 3-4 o'clock)
+      {
+        id: "mid-right-burgundy",
+        x: 710, y: 580,
+        scale: 1.55,
+        tilt: 0.50,
+        bloomStart: 0.43, bloomDuration: 0.46,
+        stemStartX: 480, stemStartY: 1000,
+        c1: { x: 560, y: 800 }, c2: { x: 660, y: 680 },
+        palette: {
+          throat: "#ffd166", throatGreen: "#55a630",
+          base: "#800f2f", mid: "#b5179e", tip: "#e63946", edge: "#ff758f",
+          spots: "#4a0011", stamen: "#ff0054", anther: "#ffb703"
+        }
+      },
+      // 8. Far Lower Left Sunny Yellow Lily (At 8-9 o'clock)
+      {
+        id: "far-left-yellow",
+        x: 215, y: 590,
+        scale: 1.50,
+        tilt: -0.55,
+        bloomStart: 0.46, bloomDuration: 0.46,
+        stemStartX: 435, stemStartY: 1000,
+        c1: { x: 340, y: 820 }, c2: { x: 240, y: 710 },
+        palette: {
+          throat: "#55a630", throatGreen: "#2b9348",
+          base: "#ca6702", mid: "#ee9b00", tip: "#ffd166", edge: "#fff066",
+          spots: "#9b2226", stamen: "#f3722c", anther: "#540b0e"
+        }
+      }
+    ];
+
+    // Background tall grasses & wheat stalks
+    const TALL_GRASSES = [
+      { x: 375, y: 150, tilt: -0.08, stemStartX: 450, stemStartY: 1000, c1: {x: 410, y: 680}, c2: {x: 385, y: 380} },
+      { x: 465, y: 120, tilt: 0.01,  stemStartX: 460, stemStartY: 1000, c1: {x: 462, y: 660}, c2: {x: 464, y: 350} },
+      { x: 555, y: 155, tilt: 0.09,  stemStartX: 470, stemStartY: 1000, c1: {x: 510, y: 680}, c2: {x: 545, y: 380} }
+    ];
+
+    // Detailed Stem-Cauline Leaves (leaves growing along each stem like real Asiatic lilies)
+    // Detailed Stem-Cauline Leaves (leaves growing along each stem like real Asiatic lilies)
+    const STEM_LEAVES = [
+      // Along Center Red Stem
+      { stemIdx: 0, t: 0.35, side: -1, len: 95, wid: 38, angle: -0.55 },
+      { stemIdx: 0, t: 0.50, side: 1,  len: 88, wid: 36, angle: 0.50 },
+      { stemIdx: 0, t: 0.65, side: -1, len: 80, wid: 32, angle: -0.45 },
+      { stemIdx: 0, t: 0.78, side: 1,  len: 70, wid: 28, angle: 0.40 },
+
+      // Along Left Pink Stem
+      { stemIdx: 1, t: 0.30, side: -1, len: 102, wid: 40, angle: -0.65 },
+      { stemIdx: 1, t: 0.45, side: 1,  len: 90, wid: 36, angle: 0.40 },
+      { stemIdx: 1, t: 0.60, side: -1, len: 80, wid: 32, angle: -0.55 },
+      { stemIdx: 1, t: 0.75, side: 1,  len: 68, wid: 28, angle: 0.35 },
+
+      // Along Right White Stem
+      { stemIdx: 2, t: 0.32, side: 1,  len: 105, wid: 40, angle: 0.65 },
+      { stemIdx: 2, t: 0.48, side: -1, len: 92, wid: 36, angle: -0.40 },
+      { stemIdx: 2, t: 0.62, side: 1,  len: 82, wid: 32, angle: 0.55 },
+      { stemIdx: 2, t: 0.76, side: -1, len: 70, wid: 28, angle: -0.35 },
+
+      // Along Upper Left Stem
+      { stemIdx: 3, t: 0.40, side: -1, len: 92, wid: 35, angle: -0.60 },
+      { stemIdx: 3, t: 0.58, side: 1,  len: 80, wid: 32, angle: 0.45 },
+      { stemIdx: 3, t: 0.72, side: -1, len: 68, wid: 26, angle: -0.50 },
+
+      // Along Top Peach Stem
+      { stemIdx: 4, t: 0.38, side: -1, len: 88, wid: 34, angle: -0.45 },
+      { stemIdx: 4, t: 0.55, side: 1,  len: 85, wid: 34, angle: 0.45 },
+      { stemIdx: 4, t: 0.70, side: -1, len: 72, wid: 28, angle: -0.40 },
+
+      // Along Top Right Stem
+      { stemIdx: 5, t: 0.40, side: 1,  len: 92, wid: 35, angle: 0.60 },
+      { stemIdx: 5, t: 0.58, side: -1, len: 80, wid: 32, angle: -0.45 },
+      { stemIdx: 5, t: 0.72, side: 1,  len: 68, wid: 26, angle: 0.50 },
+
+      // Along Mid Right Burgundy Stem
+      { stemIdx: 6, t: 0.35, side: 1,  len: 96, wid: 38, angle: 0.65 },
+      { stemIdx: 6, t: 0.55, side: -1, len: 82, wid: 32, angle: -0.40 },
+      { stemIdx: 6, t: 0.70, side: 1,  len: 68, wid: 26, angle: 0.55 },
+
+      // Along Far Left Yellow Stem
+      { stemIdx: 7, t: 0.35, side: -1, len: 96, wid: 38, angle: -0.65 },
+      { stemIdx: 7, t: 0.55, side: 1,  len: 82, wid: 32, angle: 0.40 },
+      { stemIdx: 7, t: 0.70, side: -1, len: 68, wid: 26, angle: -0.55 },
+    ];
+
+    // Broad, lush bouquet base leaves (wide arching foliage fountain matching Instagram reel)
+    const BROAD_BASE_LEAVES = [
+      // Left wide cascading foliage (sweeping outwards horizontally and drooping)
+      { startX: 450, startY: 960, tipX: 110, tipY: 895,  maxWid: 72, curveX: 250, curveY: 875, isFront: true },
+      { startX: 455, startY: 980, tipX: 175, tipY: 985,  maxWid: 65, curveX: 295, curveY: 970, isFront: true },
+      { startX: 448, startY: 935, tipX: 155, tipY: 805,  maxWid: 66, curveX: 255, curveY: 780, isFront: true },
+      { startX: 442, startY: 900, tipX: 220, tipY: 715,  maxWid: 58, curveX: 300, curveY: 700, isFront: false },
+      { startX: 445, startY: 875, tipX: 265, tipY: 645,  maxWid: 50, curveX: 335, curveY: 635, isFront: false },
+
+      // Right wide cascading foliage (sweeping outwards horizontally and drooping)
+      { startX: 465, startY: 960, tipX: 810, tipY: 895,  maxWid: 72, curveX: 670, curveY: 875, isFront: true },
+      { startX: 460, startY: 980, tipX: 745, tipY: 985,  maxWid: 65, curveX: 625, curveY: 970, isFront: true },
+      { startX: 468, startY: 935, tipX: 765, tipY: 805,  maxWid: 66, curveX: 665, curveY: 780, isFront: true },
+      { startX: 474, startY: 900, tipX: 700, tipY: 715,  maxWid: 58, curveX: 620, curveY: 700, isFront: false },
+      { startX: 470, startY: 875, tipX: 655, tipY: 645,  maxWid: 50, curveX: 585, curveY: 635, isFront: false },
+
+      // Center upright & arching fountain filler leaves (dense lush base)
+      { startX: 450, startY: 945, tipX: 365, tipY: 740,  maxWid: 62, curveX: 390, curveY: 820, isFront: true },
+      { startX: 470, startY: 945, tipX: 555, tipY: 740,  maxWid: 62, curveX: 530, curveY: 820, isFront: true },
+      { startX: 456, startY: 955, tipX: 420, tipY: 690,  maxWid: 58, curveX: 430, curveY: 790, isFront: true },
+      { startX: 464, startY: 955, tipX: 500, tipY: 690,  maxWid: 58, curveX: 490, curveY: 790, isFront: true },
+      { startX: 460, startY: 965, tipX: 460, tipY: 665,  maxWid: 62, curveX: 460, curveY: 775, isFront: true },
+      { startX: 454, startY: 995, tipX: 310, tipY: 1040, maxWid: 54, curveX: 370, curveY: 1015, isFront: true },
+      { startX: 466, startY: 995, tipX: 610, tipY: 1040, maxWid: 54, curveX: 550, curveY: 1015, isFront: true },
+    ];
+
+    function easeInOutCubic(x) {
+      return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    }
+
+    // Helper: evaluate cubic bezier point
+    function getBezierPoint(p0, p1, p2, p3, t) {
+      const u = 1 - t;
+      const tt = t * t;
+      const uu = u * u;
+      const uuu = uu * u;
+      const ttt = tt * t;
+      return {
+        x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+        y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+      };
+    }
+
+    // --- DRAW VECTOR BOUQUET ---
+    function drawVectorBouquet(v, progress, tTime) {
+      v.clearRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+
+      // Warm romantic glow behind Bouquet that intensifies with bloom
+      if (progress > 0.02) {
+        const bloomGlow = Math.min(1.0, (progress - 0.02) / 0.85);
+        const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
+        const rgBouquet = v.createRadialGradient(460, 520, 50 * pulse, 460, 520, 540 * pulse);
+        rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.34 * bloomGlow})`);
+        rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.24 * bloomGlow})`);
+        rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.15 * bloomGlow})`);
+        rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+        v.fillStyle = rgBouquet;
+        v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+      }
+
+      // 1. Tall Background Grasses & Wheat Stalks
+      TALL_GRASSES.forEach((grass, idx) => {
+        const sway = Math.sin(tTime * 1.5 + idx) * 7;
+        const curX = grass.x + sway;
+        const curY = grass.y;
+
+        v.strokeStyle = "#1b4332";
+        v.lineWidth = 4.2;
+        v.beginPath();
+        v.moveTo(grass.stemStartX, grass.stemStartY);
+        v.bezierCurveTo(grass.c1.x + sway * 0.3, grass.c1.y, grass.c2.x + sway * 0.7, grass.c2.y, curX, curY);
+        v.stroke();
+
+        v.save();
+        v.translate(curX, curY);
+        v.rotate(grass.tilt + Math.sin(tTime + idx) * 0.05);
+        v.fillStyle = "#52b788";
+        for (let g = 0; g < 13; g++) {
+          const gy = -g * 9;
+          const gw = (1 - g / 14) * 11;
+          v.beginPath();
+          v.ellipse(g % 2 === 0 ? -gw : gw, gy, 4, 9.5, (g % 2 === 0 ? -0.4 : 0.4), 0, Math.PI * 2);
+          v.fill();
+        }
+        v.restore();
+      });
+
+      // 2. Thick Bundled Stems
+      LILIES.forEach((lily, idx) => {
+        const sway = Math.sin(tTime * 1.2 + idx * 0.7) * 5;
+        const curX = lily.x + sway;
+        const curY = lily.y;
+
+        const bundleX = 455 + (idx - 3.5) * 4;
+        const p0 = { x: bundleX, y: 1000 };
+        const p1 = { x: lily.c1.x + sway * 0.3, y: lily.c1.y };
+        const p2 = { x: lily.c2.x + sway * 0.7, y: lily.c2.y };
+        const p3 = { x: curX, y: curY };
+
+        v.strokeStyle = "#081c15";
+        v.lineWidth = 11;
+        v.beginPath();
+        v.moveTo(p0.x, p0.y);
+        v.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+        v.stroke();
+
+        v.strokeStyle = "#2d6a4f";
+        v.lineWidth = 7;
+        v.stroke();
+
+        v.strokeStyle = "#74c69d";
+        v.lineWidth = 2.8;
+        v.stroke();
+      });
+
+      // 3. Draw Detailed Cauline Leaves Growing Along the Stems
+      STEM_LEAVES.forEach((leaf, lIdx) => {
+        const lily = LILIES[leaf.stemIdx];
+        const sway = Math.sin(tTime * 1.2 + leaf.stemIdx * 0.7) * 5;
+        const bundleX = 455 + (leaf.stemIdx - 3.5) * 4;
+        const p0 = { x: bundleX, y: 1000 };
+        const p1 = { x: lily.c1.x + sway * 0.3, y: lily.c1.y };
+        const p2 = { x: lily.c2.x + sway * 0.7, y: lily.c2.y };
+        const curX = lily.x + sway;
+        const curY = lily.y;
+        const p3 = { x: curX, y: curY };
+
+        const pt = getBezierPoint(p0, p1, p2, p3, leaf.t);
+
+        v.save();
+        v.translate(pt.x, pt.y);
+        const leafSway = Math.sin(tTime * 1.6 + lIdx * 0.5) * 0.06;
+        v.rotate(leaf.angle + leafSway);
+
+        drawDetailedLanceolateLeaf(v, leaf.len, leaf.wid, leaf.side);
+        v.restore();
+      });
+
+      // 4. Background Broad Base Leaves (behind flowers)
+      BROAD_BASE_LEAVES.filter(l => !l.isFront).forEach((leaf, idx) => {
+        const sway = Math.sin(tTime * 1.4 + idx) * 4;
+        drawBroadLilyLeaf(v, leaf.startX, leaf.startY, leaf.tipX + sway, leaf.tipY, leaf.maxWid, leaf.curveX + sway * 0.5, leaf.curveY, 1.0);
+      });
+
+      // 5. Render All 8 Lilies (Synchronized 0.0 -> 1.0: Realistic Buds -> Unfolding -> Full Bloom)
+      const renderOrder = [4, 3, 5, 6, 7, 0, 1, 2];
+
+      renderOrder.forEach(idx => {
+        const lily = LILIES[idx];
+        const sway = Math.sin(tTime * 1.2 + idx * 0.7) * 5;
+        const curX = lily.x + sway;
+        const curY = lily.y;
+
+        // Subtle per-flower stagger for organic naturalness
+        const stagger = (idx % 3) * 0.015;
+        const localT = Math.min(1.0, Math.max(0.0, (progress - stagger) / (1.0 - stagger)));
+        const flowerScale = lily.scale * (0.90 + 0.10 * localT);
+
+        v.save();
+        v.translate(curX, curY);
+        v.rotate(lily.tilt + Math.sin(tTime * 1.1 + idx) * 0.04);
+        v.scale(flowerScale, flowerScale);
+
+        if (localT <= 0.001) {
+          drawRealisticLilyBud(v, lily.palette, 0.0, tTime + idx);
+        } else if (localT < 0.25) {
+          const budOpening = localT / 0.25;
+          drawRealisticLilyBud(v, lily.palette, budOpening, tTime + idx);
+        } else {
+          const flowerBloom = (localT - 0.25) / 0.75;
+          const easedBloom = easeInOutCubic(flowerBloom);
+          drawBloomingLily(v, easedBloom, lily.palette, tTime + idx);
+        }
+
+        v.restore();
+      });
+
+      // 6. Foreground Broad Base Leaves (In Front of stems & lower flower bases!)
+      BROAD_BASE_LEAVES.filter(l => l.isFront).forEach((leaf, idx) => {
+        const sway = Math.sin(tTime * 1.4 + idx * 0.7) * 4;
+        drawBroadLilyLeaf(v, leaf.startX, leaf.startY, leaf.tipX + sway, leaf.tipY, leaf.maxWid, leaf.curveX + sway * 0.5, leaf.curveY, 1.0);
+      });
+
+      // Bouquet Base Wrap / Ribbon Tie
+      v.save();
+      v.translate(460, 990);
+      v.fillStyle = "rgba(40, 140, 80, 0.6)";
+      v.strokeStyle = "#74c69d";
+      v.lineWidth = 2.5;
+      v.beginPath();
+      v.ellipse(0, 0, 36, 12, 0, 0, Math.PI * 2);
+      v.fill();
+      v.stroke();
+      v.restore();
+    }
+
+    // --- DRAW BROAD DETAILED LILY FOLIAGE LEAF ---
+    function drawBroadLilyLeaf(v, startX, startY, tipX, tipY, maxWid, curveX, curveY, growth) {
+      if (growth <= 0.01) return;
+
+      v.save();
+
+      // Current tip and curve control point based on growth
+      const curTipX = startX + (tipX - startX) * growth;
+      const curTipY = startY + (tipY - startY) * growth;
+      const curCtrlX = startX + (curveX - startX) * growth;
+      const curCtrlY = startY + (curveY - startY) * growth;
+
+      const dx = curTipX - startX;
+      const dy = curTipY - startY;
+      const len = Math.hypot(dx, dy);
+      if (len < 6) { v.restore(); return; }
+
+      const ux = dx / len;
+      const uy = dy / len;
+      const nx = -uy;
+      const ny = ux;
+
+      const w = maxWid * growth;
+
+      // Base points (sheath clasping base of bouquet)
+      const baseW = w * 0.22;
+      const bLx = startX + nx * baseW;
+      const bLy = startY + ny * baseW;
+      const bRx = startX - nx * baseW;
+      const bRy = startY - ny * baseW;
+
+      // Curve midpoint offset
+      const midCtrlX = curCtrlX;
+      const midCtrlY = curCtrlY;
+
+      // Left margin belly (widest at 42% along blade)
+      const belly1X = startX + ux * (len * 0.38) + (midCtrlX - (startX + curTipX) * 0.5) * 0.6 + nx * w;
+      const belly1Y = startY + uy * (len * 0.38) + (midCtrlY - (startY + curTipY) * 0.5) * 0.6 + ny * w;
+      const taper1X = startX + ux * (len * 0.75) + (midCtrlX - (startX + curTipX) * 0.5) * 0.8 + nx * (w * 0.55);
+      const taper1Y = startY + uy * (len * 0.75) + (midCtrlY - (startY + curTipY) * 0.5) * 0.8 + ny * (w * 0.55);
+
+      // Right margin belly
+      const belly2X = startX + ux * (len * 0.38) + (midCtrlX - (startX + curTipX) * 0.5) * 0.6 - nx * w;
+      const belly2Y = startY + uy * (len * 0.38) + (midCtrlY - (startY + curTipY) * 0.5) * 0.6 - ny * w;
+      const taper2X = startX + ux * (len * 0.75) + (midCtrlX - (startX + curTipX) * 0.5) * 0.8 - nx * (w * 0.55);
+      const taper2Y = startY + uy * (len * 0.75) + (midCtrlY - (startY + curTipY) * 0.5) * 0.8 - ny * (w * 0.55);
+
+      // 1. Shaded Lower Half / Shadow side
+      const gradShadow = v.createLinearGradient(startX, startY, curTipX, curTipY);
+      gradShadow.addColorStop(0.0, "#2d6a4f");
+      gradShadow.addColorStop(0.35, "#38b000");
+      gradShadow.addColorStop(0.70, "#52b788");
+      gradShadow.addColorStop(1.0, "#95d5b2");
+
+      v.fillStyle = gradShadow;
+      v.beginPath();
+      v.moveTo(startX, startY);
+      v.lineTo(bRx, bRy);
+      v.bezierCurveTo(belly2X, belly2Y, taper2X, taper2Y, curTipX, curTipY);
+      v.quadraticCurveTo(midCtrlX, midCtrlY, startX, startY);
+      v.fill();
+
+      // 2. Sunlit Upper Half
+      const gradSun = v.createLinearGradient(startX, startY, curTipX, curTipY);
+      gradSun.addColorStop(0.0, "#40916c");
+      gradSun.addColorStop(0.30, "#70e000");
+      gradSun.addColorStop(0.65, "#74c69d");
+      gradSun.addColorStop(0.85, "#b7e4c7");
+      gradSun.addColorStop(1.0, "#d8f3dc");
+
+      v.fillStyle = gradSun;
+      v.beginPath();
+      v.moveTo(startX, startY);
+      v.lineTo(bLx, bLy);
+      v.bezierCurveTo(belly1X, belly1Y, taper1X, taper1Y, curTipX, curTipY);
+      v.quadraticCurveTo(midCtrlX, midCtrlY, startX, startY);
+      v.fill();
+
+      // 3. Complete Leaf Border Stroke
+      v.strokeStyle = "#b7e4c7";
+      v.lineWidth = 1.8;
+      v.beginPath();
+      v.moveTo(bRx, bRy);
+      v.bezierCurveTo(belly2X, belly2Y, taper2X, taper2Y, curTipX, curTipY);
+      v.bezierCurveTo(taper1X, taper1Y, belly1X, belly1Y, bLx, bLy);
+      v.closePath();
+      v.stroke();
+
+      // 4. Glowing Central Midrib Vein
+      v.strokeStyle = "rgba(235, 255, 240, 0.95)";
+      v.lineWidth = 2.6;
+      v.beginPath();
+      v.moveTo(startX, startY);
+      v.quadraticCurveTo(midCtrlX, midCtrlY, curTipX, curTipY);
+      v.stroke();
+
+      // 5. Monocot Longitudinal Striations (2 on left, 2 on right)
+      v.strokeStyle = "rgba(183, 228, 199, 0.65)";
+      v.lineWidth = 1.2;
+
+      // Inner left striation
+      v.beginPath();
+      v.moveTo(startX + nx * (w * 0.12), startY + ny * (w * 0.12));
+      v.quadraticCurveTo(midCtrlX + nx * (w * 0.38), midCtrlY + ny * (w * 0.38), curTipX, curTipY);
+      v.stroke();
+
+      // Outer left striation
+      v.beginPath();
+      v.moveTo(startX + nx * (w * 0.22), startY + ny * (w * 0.22));
+      v.quadraticCurveTo(midCtrlX + nx * (w * 0.68), midCtrlY + ny * (w * 0.68), curTipX, curTipY);
+      v.stroke();
+
+      // Inner right striation
+      v.beginPath();
+      v.moveTo(startX - nx * (w * 0.12), startY - ny * (w * 0.12));
+      v.quadraticCurveTo(midCtrlX - nx * (w * 0.38), midCtrlY - ny * (w * 0.38), curTipX, curTipY);
+      v.stroke();
+
+      // Outer right striation
+      v.beginPath();
+      v.moveTo(startX - nx * (w * 0.22), startY - ny * (w * 0.22));
+      v.quadraticCurveTo(midCtrlX - nx * (w * 0.68), midCtrlY - ny * (w * 0.68), curTipX, curTipY);
+      v.stroke();
+
+      v.restore();
+    }
+
+    // --- DRAW DETAILED LANCEOLATE LEAF ALONG STEM ---
+    function drawDetailedLanceolateLeaf(v, len, wid, side) {
+      v.save();
+      // Gradient: deep green base -> bright leaf blade -> glowing tip
+      const lg = v.createLinearGradient(0, 0, 0, -len);
+      lg.addColorStop(0.0, "#2d6a4f");
+      lg.addColorStop(0.25, "#38b000");
+      lg.addColorStop(0.60, "#52b788");
+      lg.addColorStop(0.85, "#95d5b2");
+      lg.addColorStop(1.0, "#d8f3dc");
+
+      v.fillStyle = lg;
+      v.beginPath();
+      v.moveTo(0, 0);
+
+      const tipX = side * (len * 0.32);
+      const tipY = -len;
+
+      // Generous curved left margin
+      v.bezierCurveTo(
+        -wid * 0.9 + (side * 6), -len * 0.28,
+        -wid * 1.1 + (side * 14), -len * 0.65,
+        tipX, tipY
+      );
+
+      // Generous curved right margin returning to node
+      v.bezierCurveTo(
+        wid * 1.1 + (side * 14), -len * 0.65,
+        wid * 0.9 + (side * 6), -len * 0.28,
+        0, 0
+      );
+      v.fill();
+
+      // Leaf rim highlight
+      v.strokeStyle = "#95d5b2";
+      v.lineWidth = 1.3;
+      v.stroke();
+
+      // Sharp central midrib vein
+      v.strokeStyle = "rgba(216, 243, 220, 0.75)";
+      v.lineWidth = 2.0;
+      v.beginPath();
+      v.moveTo(0, 0);
+      v.quadraticCurveTo(side * 10, -len * 0.5, tipX, tipY);
+      v.stroke();
+
+      // Parallel longitudinal striations
+      v.strokeStyle = "rgba(116, 198, 157, 0.4)";
+      v.lineWidth = 1.0;
+      v.beginPath();
+      v.moveTo(-side * 3, -len * 0.1);
+      v.quadraticCurveTo(-wid * 0.45 + side * 8, -len * 0.5, tipX, tipY);
+      v.stroke();
+
+      v.beginPath();
+      v.moveTo(side * 3, -len * 0.1);
+      v.quadraticCurveTo(wid * 0.45 + side * 8, -len * 0.5, tipX, tipY);
+      v.stroke();
+
+      v.restore();
+    }
+
+    // --- DRAW REALISTIC LILY BUD WITH SEPAL DETAILS ---
+    function drawRealisticLilyBud(v, pal, openProgress, timeOffset) {
+      v.save();
+
+      const budLen = 52 + openProgress * 18;
+      const budWid = 20 + openProgress * 16;
+      const splitAmount = openProgress * 14;
+
+      v.fillStyle = "#1b4332";
+      v.beginPath();
+      v.ellipse(0, 0, 7, 5, 0, 0, Math.PI * 2);
+      v.fill();
+
+      if (openProgress > 0.05) {
+        v.fillStyle = pal.mid;
+        v.beginPath();
+        v.ellipse(0, -budLen * 0.65, budWid * 0.45 + splitAmount * 0.4, budLen * 0.35, 0, 0, Math.PI * 2);
+        v.fill();
+
+        v.fillStyle = pal.tip;
+        v.beginPath();
+        v.ellipse(0, -budLen * 0.88, budWid * 0.25, budLen * 0.14, 0, 0, Math.PI * 2);
+        v.fill();
+      }
+
+      function drawSepal(angleOffset, sepalSpread, isCenter) {
+        v.save();
+        v.rotate(angleOffset * 0.05);
+
+        const tipX = sepalSpread;
+        const tipY = -budLen;
+
+        const sg = v.createLinearGradient(0, 0, tipX, tipY);
+        sg.addColorStop(0.0, "#1b4332");
+        sg.addColorStop(0.35, "#2d6a4f");
+        sg.addColorStop(0.70, "#40916c");
+        sg.addColorStop(0.90, openProgress > 0.1 ? pal.base : "#52b788");
+        sg.addColorStop(1.0, openProgress > 0.15 ? pal.mid : "#74c69d");
+
+        v.fillStyle = sg;
+        v.beginPath();
+        v.moveTo(0, 0);
+
+        v.bezierCurveTo(
+          -budWid * 0.6 + sepalSpread * 0.3, -budLen * 0.32,
+          -budWid * 0.5 + sepalSpread * 0.8, -budLen * 0.72,
+          tipX, tipY
+        );
+
+        v.bezierCurveTo(
+          budWid * 0.5 + sepalSpread * 0.8, -budLen * 0.72,
+          budWid * 0.6 + sepalSpread * 0.3, -budLen * 0.32,
+          0, 0
+        );
+        v.fill();
+
+        v.strokeStyle = "#95d5b2";
+        v.lineWidth = 1.1;
+        v.stroke();
+
+        v.strokeStyle = "rgba(235, 255, 240, 0.7)";
+        v.lineWidth = 1.8;
+        v.beginPath();
+        v.moveTo(0, 0);
+        v.quadraticCurveTo(sepalSpread * 0.5, -budLen * 0.5, tipX, tipY);
+        v.stroke();
+
+        v.restore();
+      }
+
+      drawSepal(-0.35, -splitAmount * 0.85, false);
+      drawSepal(0.35, splitAmount * 0.85, false);
+      drawSepal(0.0, 0, true);
+
+      v.restore();
+    }
+
+    // --- DRAW BLOOMING ASIATIC LILY ---
+    function drawBloomingLily(v, bloom, pal, timeOffset) {
+      v.save();
+
+      const numPetals = 6;
+      const baseLen = 135;
+      const maxLen = baseLen * (0.35 + 0.65 * bloom);
+      const maxWid = 44 * (0.28 + 0.72 * bloom);
+
+      const throatR = 24 * bloom;
+      const tg = v.createRadialGradient(0, 0, 2, 0, 0, Math.max(8, throatR * 1.5));
+      tg.addColorStop(0.0, pal.throatGreen);
+      tg.addColorStop(0.5, pal.throat);
+      tg.addColorStop(1.0, "rgba(0,0,0,0)");
+      v.fillStyle = tg;
+      v.beginPath();
+      v.arc(0, 0, Math.max(8, throatR * 1.5), 0, Math.PI * 2);
+      v.fill();
+
+      // Outer 3 Sepals
+      for (let i = 0; i < 3; i++) {
+        const angle = (i * 2 * Math.PI) / 3;
+        drawAsiaticPetal(v, angle, maxLen * 0.96, maxWid * 0.90, bloom, pal, false, timeOffset + i);
+      }
+
+      // Inner 3 Petals
+      for (let i = 0; i < 3; i++) {
+        const angle = (i * 2 * Math.PI) / 3 + Math.PI / 3;
+        drawAsiaticPetal(v, angle, maxLen, maxWid, bloom, pal, true, timeOffset + i + 3);
+      }
+
+      // Stamens & Pistil
+      if (bloom > 0.40) {
+        const stamProg = (bloom - 0.40) / 0.60;
+        const filamentLen = 58 * stamProg;
+
+        for (let s = 0; s < 6; s++) {
+          const sAngle = (s * Math.PI) / 3 + Math.PI / 6;
+          const sSpread = filamentLen * 0.72;
+          const fx = Math.cos(sAngle) * sSpread;
+          const fy = Math.sin(sAngle) * sSpread - 12 * stamProg;
+
+          v.strokeStyle = pal.stamen;
+          v.lineWidth = 2.0;
+          v.beginPath();
+          v.moveTo(0, 0);
+          v.quadraticCurveTo(fx * 0.4, fy * 0.4 - 5, fx, fy);
+          v.stroke();
+
+          v.save();
+          v.translate(fx, fy);
+          v.rotate(sAngle + Math.PI / 2 + Math.sin(timeOffset + s) * 0.2);
+          v.fillStyle = pal.anther;
+          v.strokeStyle = "#5a189a";
+          v.lineWidth = 0.8;
+          v.beginPath();
+          v.ellipse(0, 0, 3.5, 9.5, 0, 0, Math.PI * 2);
+          v.fill();
+          v.stroke();
+          v.restore();
+        }
+
+        // Central Pistil
+        const pistilLen = 65 * stamProg;
+        v.strokeStyle = pal.throatGreen;
+        v.lineWidth = 3.2;
+        v.beginPath();
+        v.moveTo(0, 0);
+        v.lineTo(0, -pistilLen);
+        v.stroke();
+
+        v.fillStyle = "#38b000";
+        for (let lobe = 0; lobe < 3; lobe++) {
+          const la = (lobe * 2 * Math.PI) / 3;
+          v.beginPath();
+          v.arc(Math.cos(la) * 3.5, -pistilLen + Math.sin(la) * 2.5, 3.2, 0, Math.PI * 2);
+          v.fill();
+        }
+      }
+
+      v.restore();
+    }
+
+    // --- DRAW INDIVIDUAL ASIATIC PETAL WITH 3D RECURVE & NATURAL VEINS ---
+    function drawAsiaticPetal(v, angle, len, wid, bloom, pal, isInner, seedOffset) {
+      v.save();
+      v.rotate(angle);
+
+      const recurve = Math.pow(bloom, 1.4) * 0.42;
+      const endY = -len * (1.0 - recurve * 0.22);
+      const tipCurl = recurve * 38;
+
+      const g = v.createLinearGradient(0, 0, 0, endY);
+      g.addColorStop(0.0, pal.throatGreen);
+      g.addColorStop(0.14, pal.throat);
+      g.addColorStop(0.38, pal.base);
+      g.addColorStop(0.72, pal.mid);
+      g.addColorStop(0.93, pal.tip);
+      g.addColorStop(1.0, pal.edge);
+
+      v.fillStyle = g;
+      v.beginPath();
+      v.moveTo(0, 0);
+
+      v.bezierCurveTo(
+        -wid * 0.85, endY * 0.28,
+        -wid * 0.95, endY * 0.68,
+        tipCurl * 0.35, endY
+      );
+
+      v.bezierCurveTo(
+        wid * 0.95, endY * 0.68,
+        wid * 0.85, endY * 0.28,
+        0, 0
+      );
+      v.fill();
+
+      v.strokeStyle = pal.edge;
+      v.lineWidth = 1.2;
+      v.stroke();
+
+      v.strokeStyle = "rgba(255, 255, 255, 0.45)";
+      v.lineWidth = 1.8;
+      v.beginPath();
+      v.moveTo(0, 0);
+      v.quadraticCurveTo(0, endY * 0.5, tipCurl * 0.35, endY * 0.96);
+      v.stroke();
+
+      if (bloom > 0.35 && isInner) {
+        v.fillStyle = pal.spots;
+        const seed = Math.abs(Math.sin(angle * 6.3));
+        for (let sp = 1; sp <= 11; sp++) {
+          const sy = endY * (0.16 + sp * 0.045);
+          const sx = (Math.sin(seed * sp * 13) * wid * 0.38) * (1 - sp * 0.07);
+          v.beginPath();
+          v.arc(sx, sy, 1.6, 0, Math.PI * 2);
+          v.fill();
+        }
+      }
+
+      v.restore();
+    }
+
+    // --- MAIN RENDER LOOP ---
+    let holdTimer = 0;
+
+    function render() {
+      if (isPlaying) {
+        bloomProgress += CONFIG.bloomSpeed;
+        if (bloomProgress >= 1.0) {
+          bloomProgress = 1.0;
+          if (isPortrait) {
+            // Mobile: hold full bloom for ~3.5s (210 frames), then auto-loop softly
+            holdTimer++;
+            if (holdTimer > 210) {
+              bloomProgress = 0.0;
+              holdTimer = 0;
+            }
+          } else {
+            isPlaying = false;
+            updateIcons();
+          }
+        } else {
+          holdTimer = 0;
+        }
+
+        if (!isPortrait) {
+          const sEl = document.getElementById("bloom-slider");
+          const lEl = document.getElementById("bloom-val");
+          if (sEl) sEl.value = bloomProgress;
+          if (lEl) lEl.innerText = `${Math.round(bloomProgress * 100)}%`;
+        }
+      }
+      time += CONFIG.windSpeed;
+
+      // 1. Draw Vector Bouquet
+      drawVectorBouquet(vCtx, bloomProgress, time);
+
+      // 2. Clear Display Canvas with deep black
+      const w = cssW;
+      const h = cssH;
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
+
+      // 3. Grid sizing for ASCII conversion
+      const chars = ASCII_RAMP;
+      const charLen = chars.length;
+      const fontSize = isPortrait ? 4.8 : CONFIG.fontSize;
+      const charW = fontSize * CONFIG.charAspect;
+      const charH = fontSize;
+
+      const scale = Math.min((w * 0.96) / CONFIG.baseW, (h * 0.96) / CONFIG.baseH);
+      const bouquetW = CONFIG.baseW * scale;
+      const bouquetH = CONFIG.baseH * scale;
+      const offX = (w - bouquetW) * 0.5;
+      const offY = (h - bouquetH) * 0.5 + (isPortrait ? 0 : 10);
+
+      const cols = Math.floor(bouquetW / charW);
+      const rows = Math.floor(bouquetH / charH);
+
+      const imgData = vCtx.getImageData(0, 0, CONFIG.baseW, CONFIG.baseH);
+      const data = imgData.data;
+
+      ctx.font = `${fontSize}px 'JetBrains Mono', -apple-system, BlinkMacSystemFont, ui-monospace, Menlo, monospace`;
+      ctx.textBaseline = "top";
+
+      // 4. Background ASCII Stars
+      sparkles.forEach(s => {
+        s.y -= s.speed;
+        if (s.y < 0) s.y = CONFIG.baseH;
+        const tw = Math.sin(time * 60 * s.twinkleSpeed + s.offset);
+        if (tw > -0.15) {
+          const alpha = Math.max(0.12, (tw + 0.15) * 0.85);
+          const sx = offX + (s.x / CONFIG.baseW) * bouquetW;
+          const sy = offY + (s.y / CONFIG.baseH) * bouquetH;
+          ctx.fillStyle = s.color + alpha + ")";
+          ctx.fillText(s.char, sx, sy);
+        }
+      });
+
+      // 5. Draw Bouquet in Colored ASCII Characters (Fast optimized pass)
+      for (let r = 0; r < rows; r++) {
+        const sampleY = Math.floor((r / rows) * CONFIG.baseH);
+        const drawY = offY + r * charH;
+        const rowOffset = sampleY * CONFIG.baseW;
+
+        for (let c = 0; c < cols; c++) {
+          const sampleX = Math.floor((c / cols) * CONFIG.baseW);
+          const idx = (rowOffset + sampleX) * 4;
+
+          const alphaByte = data[idx + 3];
+          if (alphaByte < 12) continue; // Fast skip transparent / empty pixels!
+
+          const red = data[idx];
+          const green = data[idx + 1];
+          const blue = data[idx + 2];
+
+          const maxVal = Math.max(red, green, blue);
+          if (maxVal < 14) continue; // Noise cutoff
+
+          const drawX = offX + c * charW;
+          const avgVal = (red + green + blue) / 3;
+          const alpha = alphaByte / 255;
+
+          const intensity = Math.min(1.0, (avgVal * 0.35 + maxVal * 0.65) / 235);
+          const charIdx = Math.min(charLen - 1, Math.floor(intensity * charLen));
+          const char = chars[charIdx];
+
+          const boostR = Math.min(255, Math.floor(red * 1.25));
+          const boostG = Math.min(255, Math.floor(green * 1.25));
+          const boostB = Math.min(255, Math.floor(blue * 1.25));
+
+          ctx.fillStyle = `rgba(${boostR}, ${boostG}, ${boostB}, ${Math.min(1.0, alpha * 1.35)})`;
+          ctx.fillText(char, drawX, drawY);
+        }
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // --- Controls ---
+    const playBtn = document.getElementById("btn-play");
+    const iconPlay = document.getElementById("icon-play");
+    const iconPause = document.getElementById("icon-pause");
+    const replayBtn = document.getElementById("btn-replay");
+    const slider = document.getElementById("bloom-slider");
+    const label = document.getElementById("bloom-val");
+    const resBtn = document.getElementById("btn-res");
+
+    function updateIcons() {
+      if (!iconPlay || !iconPause) return;
+      if (isPlaying) {
+        iconPlay.style.display = "none";
+        iconPause.style.display = "block";
+      } else {
+        iconPlay.style.display = "block";
+        iconPause.style.display = "none";
+      }
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener("click", () => {
+        isPlaying = !isPlaying;
+        if (isPlaying && bloomProgress >= 0.999) {
+          bloomProgress = 0;
+        }
+        updateIcons();
+      });
+    }
+
+    if (replayBtn) {
+      replayBtn.addEventListener("click", () => {
+        bloomProgress = 0;
+        isPlaying = true;
+        updateIcons();
+      });
+    }
+
+    if (slider) {
+      slider.addEventListener("input", (e) => {
+        bloomProgress = parseFloat(e.target.value);
+        if (label) label.innerText = `${Math.round(bloomProgress * 100)}%`;
+        isPlaying = false;
+        updateIcons();
+      });
+    }
+
+    let isHD = true;
+    if (resBtn) {
+      resBtn.addEventListener("click", () => {
+        isHD = !isHD;
+        CONFIG.fontSize = isHD ? 5.6 : 8.5;
+        resBtn.innerText = isHD ? "HD" : "RETRO";
+      });
+    }
+
+    // --- Clean Mobile Touch Interaction ---
+    window.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest(".controls")) return;
+      if (isPortrait) {
+        if (bloomProgress >= 0.95) {
+          bloomProgress = 0.0;
+          holdTimer = 0;
+          isPlaying = true;
+        } else {
+          isPlaying = !isPlaying;
+        }
+      }
+    });
+
+    // Start
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

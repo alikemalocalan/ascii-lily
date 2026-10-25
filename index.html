@@ -54,13 +54,16 @@
       transform: translateX(-50%);
       z-index: 50;
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 96vw;
       align-items: center;
-      gap: 12px;
-      background: rgba(16, 16, 20, 0.85);
+      gap: 10px;
+      background: rgba(16, 16, 20, 0.88);
       backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 8px 20px;
-      border-radius: 30px;
+      padding: 8px 18px;
+      border-radius: 28px;
       opacity: 0;
       transition: opacity 0.35s ease;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
@@ -232,23 +235,28 @@
     <button class="tag-btn" onclick="setBloom(0.66)">Gülümseme</button>
     <button class="tag-btn" onclick="setBloom(1.0)">Tam Çiçek</button>
 
-    <label class="toggle-checkbox" title="Ekrana tıklandığında veya fare gezdirildiğinde su dalgaları ve ışıltılar saçar">
-      <input type="checkbox" id="check-ripple" checked />
-      <span>Dalga & Işıltı</span>
+    <label class="toggle-checkbox" title="Dalga Efekti">
+      <input type="checkbox" id="check-ripple" />
+      <span>Dalga</span>
     </label>
 
     <div class="theme-group">
-      <label class="toggle-checkbox" title="Alternatif renk temalarını aç/kapat">
+      <label class="toggle-checkbox" title="Renk Teması">
         <input type="checkbox" id="check-theme" />
-        <span>Renk Teması</span>
+        <span>Tema</span>
       </label>
-      <select id="select-theme" class="theme-select" style="display:none;" title="Renk Teması Seç">
-        <option value="cyber">Cyber Neon (Mor & Camgöbeği)</option>
-        <option value="sakura">Pastel Sakura (Kiraz Çiçeği & Lavanta)</option>
-        <option value="golden">Golden Twilight (Sıcak Altın & Kehribar)</option>
-        <option value="emerald">Emerald Forest (Büyülü Zümrüt & Nane)</option>
+      <select id="select-theme" class="theme-select" style="display:none;" title="Tema Seç">
+        <option value="cyber">Cyber Neon</option>
+        <option value="sakura">Pastel Sakura</option>
+        <option value="golden">Golden Twilight</option>
+        <option value="emerald">Emerald Forest</option>
       </select>
     </div>
+
+    <label class="toggle-checkbox" title="Şafak Efekti">
+      <input type="checkbox" id="check-dawn" checked />
+      <span>Şafak</span>
+    </label>
   </div>
 
   <script>
@@ -329,6 +337,9 @@
         baseColor: Math.random() > 0.4 ? "rgba(255, 235, 190, " : "rgba(216, 243, 220, "
       });
     }
+
+    // Dawn illumination atmosphere toggle
+    let dawnEnabled = true;
 
     let dpr = 1;
     let cssW = window.innerWidth || 1200;
@@ -726,17 +737,42 @@
     function drawVectorScene(v, progress, tTime) {
       v.clearRect(0, 0, CONFIG.baseW, CONFIG.baseH);
 
-      // 1. Dynamic Celestial Aurora
+      // 1. Dynamic Celestial Atmosphere (Concept 1: Night to Dawn)
       const bloomGlow = Math.min(1.0, progress * 1.15);
       const glowPal = THEME_GLOWS[activeTheme] || THEME_GLOWS.original;
 
-      // Deep celestial nebula background
-      const bgGrad = v.createLinearGradient(0, 0, CONFIG.baseW, CONFIG.baseH);
-      bgGrad.addColorStop(0.0, `rgba(5, 8, 22, ${0.40 * bloomGlow})`);
-      bgGrad.addColorStop(0.5, `rgba(22, 10, 30, ${0.30 * bloomGlow})`);
-      bgGrad.addColorStop(1.0, `rgba(8, 18, 18, ${0.40 * bloomGlow})`);
-      v.fillStyle = bgGrad;
-      v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+      if (dawnEnabled && progress > 0.01) {
+        // --- CONCEPT 1: NIGHT TO DAWN SKY ILLUMINATION ---
+        const dawnT = Math.pow(progress, 1.15);
+        const skyGrad = v.createLinearGradient(0, 0, 0, CONFIG.baseH);
+        skyGrad.addColorStop(0.0, `rgba(${Math.round(6 + dawnT * 18)}, ${Math.round(10 + dawnT * 22)}, ${Math.round(28 + dawnT * 38)}, ${0.45 + 0.25 * (1 - dawnT)})`);
+        skyGrad.addColorStop(0.42, `rgba(${Math.round(26 + dawnT * 70)}, ${Math.round(14 + dawnT * 32)}, ${Math.round(36 + dawnT * 40)}, ${0.35 + 0.22 * dawnT})`);
+        skyGrad.addColorStop(0.78, `rgba(${Math.round(38 + dawnT * 135)}, ${Math.round(18 + dawnT * 75)}, ${Math.round(32 + dawnT * 35)}, ${0.28 + 0.32 * dawnT})`);
+        skyGrad.addColorStop(1.0, `rgba(${Math.round(48 + dawnT * 165)}, ${Math.round(24 + dawnT * 105)}, ${Math.round(28 + dawnT * 42)}, ${0.25 + 0.40 * dawnT})`);
+        v.fillStyle = skyGrad;
+        v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+
+        // Rising Dawn Sunburst behind the bouquet
+        const sunX = isPortrait ? (CONFIG.baseW * 0.5) : 1140;
+        const sunY = isPortrait ? (CONFIG.baseH * 0.72 - dawnT * 50) : (540 - dawnT * 50);
+        const sunRad = isPortrait ? 520 : 640;
+        const sunGrad = v.createRadialGradient(sunX, sunY, 30, sunX, sunY, sunRad);
+        sunGrad.addColorStop(0.0, `rgba(255, 244, 205, ${0.46 * dawnT})`);
+        sunGrad.addColorStop(0.28, `rgba(255, 195, 115, ${0.36 * dawnT})`);
+        sunGrad.addColorStop(0.58, `rgba(235, 120, 85, ${0.22 * dawnT})`);
+        sunGrad.addColorStop(0.85, `rgba(165, 55, 95, ${0.12 * dawnT})`);
+        sunGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+        v.fillStyle = sunGrad;
+        v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+      } else {
+        // Deep celestial nebula background
+        const bgGrad = v.createLinearGradient(0, 0, CONFIG.baseW, CONFIG.baseH);
+        bgGrad.addColorStop(0.0, `rgba(5, 8, 22, ${0.40 * bloomGlow})`);
+        bgGrad.addColorStop(0.5, `rgba(22, 10, 30, ${0.30 * bloomGlow})`);
+        bgGrad.addColorStop(1.0, `rgba(8, 18, 18, ${0.40 * bloomGlow})`);
+        v.fillStyle = bgGrad;
+        v.fillRect(0, 0, CONFIG.baseW, CONFIG.baseH);
+      }
 
       if (isPortrait) {
         // ==========================================
@@ -1393,7 +1429,7 @@
     }
 
     // --- INTERACTIVE RIPPLE & BURST SPARKLES (DESKTOP) ---
-    let rippleEnabled = true;
+    let rippleEnabled = false;
     const ripples = [];
     const burstSparkles = [];
 
@@ -1625,6 +1661,7 @@
     const checkRipple = document.getElementById("check-ripple");
     const checkTheme = document.getElementById("check-theme");
     const selectTheme = document.getElementById("select-theme");
+    const checkDawn = document.getElementById("check-dawn");
 
     function updateIcons() {
       if (!iconPlay || !iconPause) return;
@@ -1672,6 +1709,7 @@
 
     // --- DESKTOP RIPPLE & THEME CHECKBOX LISTENERS ---
     if (checkRipple) {
+      checkRipple.checked = rippleEnabled;
       checkRipple.addEventListener("change", (e) => {
         rippleEnabled = e.target.checked;
         if (!rippleEnabled) {
@@ -1700,6 +1738,14 @@
         if (checkTheme && checkTheme.checked) {
           applyTheme(e.target.value);
         }
+      });
+    }
+
+    // --- DESKTOP DAWN CHECKBOX LISTENER ---
+    if (checkDawn) {
+      checkDawn.checked = dawnEnabled;
+      checkDawn.addEventListener("change", (e) => {
+        dawnEnabled = e.target.checked;
       });
     }
 
