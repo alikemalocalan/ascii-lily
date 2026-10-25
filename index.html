@@ -150,6 +150,56 @@
       color: #ffffff;
       border-color: #52b788;
     }
+
+    .toggle-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.70rem;
+      color: #dddddd;
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .toggle-checkbox:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: #52b788;
+      color: #ffffff;
+    }
+    .toggle-checkbox input[type="checkbox"] {
+      accent-color: #52b788;
+      cursor: pointer;
+      width: 13px;
+      height: 13px;
+      margin: 0;
+    }
+
+    .theme-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .theme-select {
+      background: rgba(22, 24, 30, 0.95);
+      border: 1px solid #52b788;
+      color: #74c69d;
+      font-size: 0.70rem;
+      font-family: inherit;
+      padding: 3px 8px;
+      border-radius: 12px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .theme-select:hover {
+      border-color: #a7f3d0;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -177,10 +227,28 @@
       <span class="label" id="bloom-val">0%</span>
     </div>
 
-    <button class="tag-btn" onclick="setBloom(0.0)">Başlangıç (Uykuda & Tomurcuk)</button>
-    <button class="tag-btn" onclick="setBloom(0.33)">Zeytin Filizi & Uyanış</button>
-    <button class="tag-btn" onclick="setBloom(0.66)">Gülümseme & Taç Büyümesi</button>
-    <button class="tag-btn" onclick="setBloom(1.0)">Tam Senkron Açılış</button>
+    <button class="tag-btn" onclick="setBloom(0.0)">Başlangıç</button>
+    <button class="tag-btn" onclick="setBloom(0.33)">Filiz</button>
+    <button class="tag-btn" onclick="setBloom(0.66)">Gülümseme</button>
+    <button class="tag-btn" onclick="setBloom(1.0)">Tam Çiçek</button>
+
+    <label class="toggle-checkbox" title="Ekrana tıklandığında veya fare gezdirildiğinde su dalgaları ve ışıltılar saçar">
+      <input type="checkbox" id="check-ripple" checked />
+      <span>Dalga & Işıltı</span>
+    </label>
+
+    <div class="theme-group">
+      <label class="toggle-checkbox" title="Alternatif renk temalarını aç/kapat">
+        <input type="checkbox" id="check-theme" />
+        <span>Renk Teması</span>
+      </label>
+      <select id="select-theme" class="theme-select" style="display:none;" title="Renk Teması Seç">
+        <option value="cyber">Cyber Neon (Mor & Camgöbeği)</option>
+        <option value="sakura">Pastel Sakura (Kiraz Çiçeği & Lavanta)</option>
+        <option value="golden">Golden Twilight (Sıcak Altın & Kehribar)</option>
+        <option value="emerald">Emerald Forest (Büyülü Zümrüt & Nane)</option>
+      </select>
+    </div>
   </div>
 
   <script>
@@ -219,7 +287,7 @@
     const vCanvas = document.createElement("canvas");
     const vCtx = vCanvas.getContext("2d", { willReadFrequently: true });
 
-    // Load Clara's 4 photographic stages (NO HAT! Slow olive branch sprouting into Roman crown)
+    // Load Clara's 4 photographic stages with WebP compression (312 KB payload vs 8.24 MB PNG: 96% reduction)
     const img0 = new Image();
     const img1 = new Image();
     const img2 = new Image();
@@ -229,16 +297,23 @@
     function onImgLoad() {
       imagesLoaded++;
     }
-    img0.onload = onImgLoad;
-    img1.onload = onImgLoad;
-    img2.onload = onImgLoad;
-    img3.onload = onImgLoad;
 
-    // Transparent PNG stages with NO black background
-    img0.src = "clara_0_closed.png";   // Stage 0: Natural hair, closed eyes, calm lips, no hat, no crown
-    img1.src = "clara_1_sprout.png";   // Stage 1: Eyes cracking open, soft smile starting, olive shoot peeking out
-    img2.src = "clara_2_growing.png";  // Stage 2: Eyes half open looking right, warm smile, olive branch wrapping hair
-    img3.src = "clara_3_crown.png";    // Stage 3: Eyes wide open clear blue looking right, radiant smile, full Roman olive wreath crown
+    function setupClaraImg(img, webpSrc, pngSrc) {
+      img.onload = onImgLoad;
+      img.onerror = () => {
+        if (!img.dataset.fallback) {
+          img.dataset.fallback = "1";
+          img.src = pngSrc;
+        }
+      };
+      img.src = webpSrc;
+    }
+
+    // High performance transparent WebP stages
+    setupClaraImg(img0, "clara_0_closed.webp", "clara_0_closed.png");
+    setupClaraImg(img1, "clara_1_sprout.webp", "clara_1_sprout.png");
+    setupClaraImg(img2, "clara_2_growing.webp", "clara_2_growing.png");
+    setupClaraImg(img3, "clara_3_crown.webp", "clara_3_crown.png");
 
     // Floating background stars and drifting fragrant petals
     const sparkles = [];
@@ -412,6 +487,92 @@
       }
     ];
 
+    // Original Botanical Palettes
+    const ORIGINAL_PALETTES = LILIES.map(l => ({ ...l.palette }));
+
+    // Curation of Stunning Color Themes (Interactive Desktop Toggle)
+    const THEME_PALETTES = {
+      cyber: [
+        { throat: "#00f5d4", throatGreen: "#00bbf9", base: "#7209b7", mid: "#f72585", tip: "#4cc9f0", edge: "#ffffff", spots: "#3a0ca3", stamen: "#f72585", anther: "#00f5d4" },
+        { throat: "#f72585", throatGreen: "#7209b7", base: "#3a0ca3", mid: "#4361ee", tip: "#4cc9f0", edge: "#b5179e", spots: "#03045e", stamen: "#4cc9f0", anther: "#fee440" },
+        { throat: "#00f5d4", throatGreen: "#0077b6", base: "#480ca8", mid: "#b5179e", tip: "#f72585", edge: "#ffffff", spots: "#3f37c9", stamen: "#f72585", anther: "#00f5d4" },
+        { throat: "#7209b7", throatGreen: "#3f37c9", base: "#03045e", mid: "#0077b6", tip: "#00b4d8", edge: "#90e0ef", spots: "#023e8a", stamen: "#48cae4", anther: "#f72585" },
+        { throat: "#fee440", throatGreen: "#00f5d4", base: "#560bad", mid: "#7209b7", tip: "#b5179e", edge: "#f72585", spots: "#480ca8", stamen: "#f72585", anther: "#fee440" },
+        { throat: "#00f5d4", throatGreen: "#00bbf9", base: "#7209b7", mid: "#4cc9f0", tip: "#48cae4", edge: "#caf0f8", spots: "#3a0ca3", stamen: "#00bbf9", anther: "#f72585" },
+        { throat: "#f72585", throatGreen: "#560bad", base: "#240046", mid: "#5a189a", tip: "#9d4edd", edge: "#e0aaff", spots: "#10002b", stamen: "#c77dff", anther: "#00f5d4" },
+        { throat: "#fee440", throatGreen: "#00f5d4", base: "#3a0ca3", mid: "#4361ee", tip: "#4cc9f0", edge: "#f72585", spots: "#03045e", stamen: "#4cc9f0", anther: "#fee440" }
+      ],
+      sakura: [
+        { throat: "#b7e4c7", throatGreen: "#74c69d", base: "#ffb4a2", mid: "#ffcad4", tip: "#ffb7b2", edge: "#ffffff", spots: "#e5989b", stamen: "#e5989b", anther: "#ffcad4" },
+        { throat: "#e0aaff", throatGreen: "#95d5b2", base: "#c77dff", mid: "#e0aaff", tip: "#f1c0e8", edge: "#ffffff", spots: "#9d4edd", stamen: "#c77dff", anther: "#ffb4a2" },
+        { throat: "#d8f3dc", throatGreen: "#95d5b2", base: "#e8e8e4", mid: "#f8edeb", tip: "#ffffff", edge: "#ffffff", spots: "#b7e4c7", stamen: "#ffcad4", anther: "#e0aaff" },
+        { throat: "#c8b6ff", throatGreen: "#95d5b2", base: "#d8bbff", mid: "#e7c6ff", tip: "#ffd6ff", edge: "#ffffff", spots: "#bbadff", stamen: "#c8b6ff", anther: "#ffcad4" },
+        { throat: "#ffd6a5", throatGreen: "#a3c4bc", base: "#ffcad4", mid: "#ffe5d9", tip: "#fff1e6", edge: "#ffffff", spots: "#f4acb7", stamen: "#f4acb7", anther: "#c8b6ff" },
+        { throat: "#fdffb6", throatGreen: "#b7e4c7", base: "#ffcad4", mid: "#ffd6a5", tip: "#fdffb6", edge: "#ffffff", spots: "#f4acb7", stamen: "#ffd6a5", anther: "#ffb4a2" },
+        { throat: "#ffc6ff", throatGreen: "#b7e4c7", base: "#b5179e", mid: "#f72585", tip: "#ffcad4", edge: "#ffffff", spots: "#7209b7", stamen: "#f72585", anther: "#c8b6ff" },
+        { throat: "#caffbf", throatGreen: "#95d5b2", base: "#ffc6ff", mid: "#bdb2ff", tip: "#a0c4ff", edge: "#ffffff", spots: "#7209b7", stamen: "#bdb2ff", anther: "#ffd6a5" }
+      ],
+      golden: [
+        { throat: "#ffe6a7", throatGreen: "#6b705c", base: "#6f1d1b", mid: "#bb9457", tip: "#ffe6a7", edge: "#fff3b0", spots: "#43281c", stamen: "#bb9457", anther: "#99582a" },
+        { throat: "#ffb703", throatGreen: "#588157", base: "#9d0208", mid: "#d00000", tip: "#ffb703", edge: "#ffe49e", spots: "#6a040f", stamen: "#fb8500", anther: "#ffb703" },
+        { throat: "#ffe49e", throatGreen: "#3a5a40", base: "#d4a373", mid: "#faedcd", tip: "#fefae0", edge: "#ffffff", spots: "#bc6c25", stamen: "#ddb892", anther: "#99582a" },
+        { throat: "#ffb703", throatGreen: "#344e41", base: "#9a8c98", mid: "#c9ada7", tip: "#f2e9e4", edge: "#ffffff", spots: "#4a4e69", stamen: "#c9ada7", anther: "#ffb703" },
+        { throat: "#ffb703", throatGreen: "#588157", base: "#ca6702", mid: "#ee9b00", tip: "#fed9b7", edge: "#ffffff", spots: "#9b2226", stamen: "#ee9b00", anther: "#ca6702" },
+        { throat: "#ffea00", throatGreen: "#55a630", base: "#ca6702", mid: "#ee9b00", tip: "#ffd166", edge: "#fff066", spots: "#7f4f24", stamen: "#ee9b00", anther: "#ca6702" },
+        { throat: "#ffd166", throatGreen: "#344e41", base: "#540b0e", mid: "#9e2a2b", tip: "#e09f3e", edge: "#fff3b0", spots: "#335c67", stamen: "#e09f3e", anther: "#fff3b0" },
+        { throat: "#ffd166", throatGreen: "#3a5a40", base: "#ca6702", mid: "#ee9b00", tip: "#ffea00", edge: "#fff3b0", spots: "#9b2226", stamen: "#ee9b00", anther: "#540b0e" }
+      ],
+      emerald: [
+        { throat: "#ccff33", throatGreen: "#007f5f", base: "#1b4332", mid: "#2d6a4f", tip: "#74c69d", edge: "#d8f3dc", spots: "#081c15", stamen: "#52b788", anther: "#ccff33" },
+        { throat: "#00f5d4", throatGreen: "#007f5f", base: "#081c15", mid: "#1b4332", tip: "#52b788", edge: "#95d5b2", spots: "#004b23", stamen: "#74c69d", anther: "#00f5d4" },
+        { throat: "#b7e4c7", throatGreen: "#2d6a4f", base: "#2d6a4f", mid: "#74c69d", tip: "#d8f3dc", edge: "#ffffff", spots: "#1b4332", stamen: "#95d5b2", anther: "#ccff33" },
+        { throat: "#70e000", throatGreen: "#004b23", base: "#081c15", mid: "#2d6a4f", tip: "#95d5b2", edge: "#e8f5e9", spots: "#002900", stamen: "#74c69d", anther: "#70e000" },
+        { throat: "#e9ff70", throatGreen: "#38b000", base: "#007f5f", mid: "#2b9348", tip: "#80b918", edge: "#d8f3dc", spots: "#004b23", stamen: "#55a630", anther: "#e9ff70" },
+        { throat: "#00f5d4", throatGreen: "#007f5f", base: "#004b23", mid: "#38b000", tip: "#70e000", edge: "#d8f3dc", spots: "#002900", stamen: "#38b000", anther: "#00f5d4" },
+        { throat: "#70e000", throatGreen: "#004b23", base: "#081c15", mid: "#1b4332", tip: "#38b000", edge: "#b7e4c7", spots: "#001e00", stamen: "#52b788", anther: "#ccff33" },
+        { throat: "#00f5d4", throatGreen: "#007f5f", base: "#004b23", mid: "#10b981", tip: "#6ee7b7", edge: "#d8f3dc", spots: "#081c15", stamen: "#10b981", anther: "#00f5d4" }
+      ]
+    };
+
+    const THEME_GLOWS = {
+      original: {
+        clara: ["rgba(116, 198, 157, ", "rgba(255, 225, 90, ", "rgba(25, 85, 95, "],
+        bouquet: ["rgba(255, 90, 120, ", "rgba(255, 180, 80, ", "rgba(140, 30, 180, "]
+      },
+      cyber: {
+        clara: ["rgba(0, 245, 212, ", "rgba(114, 9, 183, ", "rgba(58, 12, 163, "],
+        bouquet: ["rgba(247, 37, 133, ", "rgba(76, 201, 240, ", "rgba(114, 9, 183, "]
+      },
+      sakura: {
+        clara: ["rgba(255, 202, 212, ", "rgba(224, 170, 255, ", "rgba(181, 23, 158, "],
+        bouquet: ["rgba(255, 154, 162, ", "rgba(255, 183, 178, ", "rgba(224, 170, 255, "]
+      },
+      golden: {
+        clara: ["rgba(255, 214, 10, ", "rgba(255, 183, 3, ", "rgba(217, 119, 6, "],
+        bouquet: ["rgba(255, 183, 3, ", "rgba(251, 133, 0, ", "rgba(208, 0, 0, "]
+      },
+      emerald: {
+        clara: ["rgba(167, 243, 208, ", "rgba(52, 211, 153, ", "rgba(5, 150, 105, "],
+        bouquet: ["rgba(110, 231, 183, ", "rgba(16, 185, 129, ", "rgba(6, 78, 59, "]
+      }
+    };
+
+    let activeTheme = "original";
+    function applyTheme(key) {
+      if (!key || key === "original" || !THEME_PALETTES[key]) {
+        activeTheme = "original";
+        LILIES.forEach((lily, idx) => {
+          lily.palette = { ...ORIGINAL_PALETTES[idx] };
+        });
+      } else {
+        activeTheme = key;
+        const set = THEME_PALETTES[key];
+        LILIES.forEach((lily, idx) => {
+          lily.palette = { ...set[idx] };
+        });
+      }
+    }
+
     // Background tall grasses & wheat stalks
     const TALL_GRASSES = [
       { x: 375, y: 150, tilt: -0.08, stemStartX: 450, stemStartY: 1000, c1: {x: 410, y: 680}, c2: {x: 385, y: 380} },
@@ -567,6 +728,7 @@
 
       // 1. Dynamic Celestial Aurora
       const bloomGlow = Math.min(1.0, progress * 1.15);
+      const glowPal = THEME_GLOWS[activeTheme] || THEME_GLOWS.original;
 
       // Deep celestial nebula background
       const bgGrad = v.createLinearGradient(0, 0, CONFIG.baseW, CONFIG.baseH);
@@ -588,9 +750,9 @@
         if (bloomGlow > 0.01) {
           const pulseC = 1 + Math.cos(tTime * 1.8) * 0.03;
           const rgClara = v.createRadialGradient(CONFIG.baseW * 0.5, cY + cSize * 0.40, 40 * pulseC, CONFIG.baseW * 0.5, cY + cSize * 0.40, 420 * pulseC);
-          rgClara.addColorStop(0.0, `rgba(116, 198, 157, ${0.35 * bloomGlow})`);
-          rgClara.addColorStop(0.38, `rgba(255, 225, 90, ${0.22 * bloomGlow})`);
-          rgClara.addColorStop(0.75, `rgba(25, 85, 95, ${0.12 * bloomGlow})`);
+          rgClara.addColorStop(0.0, `${glowPal.clara[0]}${0.35 * bloomGlow})`);
+          rgClara.addColorStop(0.38, `${glowPal.clara[1]}${0.22 * bloomGlow})`);
+          rgClara.addColorStop(0.75, `${glowPal.clara[2]}${0.12 * bloomGlow})`);
           rgClara.addColorStop(1.0, "rgba(0, 0, 0, 0)");
           v.fillStyle = rgClara;
           v.fillRect(0, 0, CONFIG.baseW, Math.floor(CONFIG.baseH * 0.52));
@@ -604,9 +766,9 @@
         if (bloomGlow > 0.01) {
           const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
           const rgBouquet = v.createRadialGradient(CONFIG.baseW * 0.5, bouquetY + 540 * bouquetScale, 50 * pulse, CONFIG.baseW * 0.5, bouquetY + 540 * bouquetScale, 520 * pulse);
-          rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.36 * bloomGlow})`);
-          rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.26 * bloomGlow})`);
-          rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.16 * bloomGlow})`);
+          rgBouquet.addColorStop(0.0, `${glowPal.bouquet[0]}${0.36 * bloomGlow})`);
+          rgBouquet.addColorStop(0.35, `${glowPal.bouquet[1]}${0.26 * bloomGlow})`);
+          rgBouquet.addColorStop(0.68, `${glowPal.bouquet[2]}${0.16 * bloomGlow})`);
           rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
           v.fillStyle = rgBouquet;
           v.fillRect(0, Math.floor(CONFIG.baseH * 0.42), CONFIG.baseW, CONFIG.baseH);
@@ -647,9 +809,9 @@
         if (bloomGlow > 0.01) {
           const pulse = 1 + Math.sin(tTime * 2.0) * 0.04;
           const rgBouquet = v.createRadialGradient(1140, 500, 50 * pulse, 1140, 500, 560 * pulse);
-          rgBouquet.addColorStop(0.0, `rgba(255, 90, 120, ${0.32 * bloomGlow})`);
-          rgBouquet.addColorStop(0.35, `rgba(255, 180, 80, ${0.24 * bloomGlow})`);
-          rgBouquet.addColorStop(0.68, `rgba(140, 30, 180, ${0.15 * bloomGlow})`);
+          rgBouquet.addColorStop(0.0, `${glowPal.bouquet[0]}${0.32 * bloomGlow})`);
+          rgBouquet.addColorStop(0.35, `${glowPal.bouquet[1]}${0.24 * bloomGlow})`);
+          rgBouquet.addColorStop(0.68, `${glowPal.bouquet[2]}${0.15 * bloomGlow})`);
           rgBouquet.addColorStop(1.0, "rgba(0, 0, 0, 0)");
           v.fillStyle = rgBouquet;
           v.fillRect(520, 0, 1080, CONFIG.baseH);
@@ -659,9 +821,9 @@
         if (bloomGlow > 0.01) {
           const pulseC = 1 + Math.cos(tTime * 1.8) * 0.03;
           const rgClara = v.createRadialGradient(390, 380, 40 * pulseC, 390, 380, 460 * pulseC);
-          rgClara.addColorStop(0.0, `rgba(116, 198, 157, ${0.30 * bloomGlow})`);
-          rgClara.addColorStop(0.38, `rgba(255, 225, 90, ${0.18 * bloomGlow})`);
-          rgClara.addColorStop(0.75, `rgba(25, 85, 95, ${0.10 * bloomGlow})`);
+          rgClara.addColorStop(0.0, `${glowPal.clara[0]}${0.30 * bloomGlow})`);
+          rgClara.addColorStop(0.38, `${glowPal.clara[1]}${0.18 * bloomGlow})`);
+          rgClara.addColorStop(0.75, `${glowPal.clara[2]}${0.10 * bloomGlow})`);
           rgClara.addColorStop(1.0, "rgba(0, 0, 0, 0)");
           v.fillStyle = rgClara;
           v.fillRect(0, 0, 850, CONFIG.baseH);
@@ -1230,6 +1392,51 @@
       v.restore();
     }
 
+    // --- INTERACTIVE RIPPLE & BURST SPARKLES (DESKTOP) ---
+    let rippleEnabled = true;
+    const ripples = [];
+    const burstSparkles = [];
+
+    function addRipple(clientX, clientY, isBurst = false) {
+      if (!rippleEnabled) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      ripples.push({
+        x: x,
+        y: y,
+        radius: 0,
+        maxRadius: isBurst ? 520 : 260,
+        speed: isBurst ? 12 : 7.5,
+        strength: isBurst ? 1.0 : 0.42
+      });
+
+      const count = isBurst ? 22 : 4;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (isBurst ? 1.4 : 0.8) + Math.random() * (isBurst ? 4.2 : 2.0);
+        burstSparkles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - (isBurst ? 1.2 : 0.4),
+          char: ["✦", "✧", "⋆", "*", "•", "°"][Math.floor(Math.random() * 6)],
+          color: [
+            "rgba(255, 224, 102, ",
+            "rgba(255, 117, 143, ",
+            "rgba(116, 198, 157, ",
+            "rgba(255, 255, 255, ",
+            "rgba(76, 201, 240, ",
+            "rgba(224, 170, 255, "
+          ][Math.floor(Math.random() * 6)],
+          alpha: 1.0,
+          decay: 0.016 + Math.random() * 0.02,
+          size: (isBurst ? 8.5 : 6.5) + Math.random() * 5.5
+        });
+      }
+    }
+
     // --- MAIN RENDER LOOP ---
     let holdTimer = 0;
 
@@ -1311,6 +1518,19 @@
         }
       });
 
+      // Update interactive ripples
+      const hasRipples = rippleEnabled && ripples.length > 0;
+      if (hasRipples) {
+        for (let i = ripples.length - 1; i >= 0; i--) {
+          const rp = ripples[i];
+          rp.radius += rp.speed;
+          rp.strength *= 0.965;
+          if (rp.strength < 0.02 || rp.radius > rp.maxRadius) {
+            ripples.splice(i, 1);
+          }
+        }
+      }
+
       // 5. Draw Scene in Colored ASCII Characters (Fast optimized pass)
       for (let r = 0; r < rows; r++) {
         const sampleY = Math.floor((r / rows) * CONFIG.baseH);
@@ -1318,22 +1538,46 @@
         const rowOffset = sampleY * CONFIG.baseW;
 
         for (let c = 0; c < cols; c++) {
+          const drawX = offX + c * charW;
           const sampleX = Math.floor((c / cols) * CONFIG.baseW);
           const idx = (rowOffset + sampleX) * 4;
 
           const alphaByte = data[idx + 3];
-          if (alphaByte < 12) continue; // Fast skip empty/transparent pixels
 
-          const red = data[idx];
-          const green = data[idx + 1];
-          const blue = data[idx + 2];
+          // Optical water wave & luminescence boost from ripples
+          let rippleBoost = 0;
+          if (hasRipples) {
+            for (let ri = 0; ri < ripples.length; ri++) {
+              const rp = ripples[ri];
+              const dx = drawX - rp.x;
+              const dy = drawY - rp.y;
+              const dist = Math.hypot(dx, dy);
+              const waveDist = dist - rp.radius;
+
+              if (Math.abs(waveDist) < 65) {
+                const wave = Math.sin(waveDist * 0.12) * Math.exp(-Math.pow(waveDist * 0.035, 2)) * rp.strength;
+                rippleBoost += wave * 85;
+              }
+            }
+          }
+
+          if (alphaByte < 12 && rippleBoost <= 8) continue; // Fast skip empty/transparent pixels
+
+          let red = data[idx];
+          let green = data[idx + 1];
+          let blue = data[idx + 2];
+
+          if (rippleBoost !== 0) {
+            red = Math.min(255, Math.max(0, red + rippleBoost));
+            green = Math.min(255, Math.max(0, green + rippleBoost * 0.9));
+            blue = Math.min(255, Math.max(0, blue + rippleBoost * 1.25));
+          }
 
           const maxVal = Math.max(red, green, blue);
           if (maxVal < 14) continue; // Cut off noise in pure black background
 
-          const drawX = offX + c * charW;
           const avgVal = (red + green + blue) / 3;
-          const alpha = alphaByte / 255;
+          const alpha = Math.min(1.0, (alphaByte / 255) + Math.max(0, rippleBoost / 255));
 
           const intensity = Math.min(1.0, (avgVal * 0.35 + maxVal * 0.65) / 235);
           const charIdx = Math.min(charLen - 1, Math.floor(intensity * charLen));
@@ -1349,6 +1593,25 @@
         }
       }
 
+      // 6. Draw Interactive Sparkles Bursts
+      if (rippleEnabled && burstSparkles.length > 0) {
+        for (let i = burstSparkles.length - 1; i >= 0; i--) {
+          const sp = burstSparkles[i];
+          sp.x += sp.vx;
+          sp.y += sp.vy;
+          sp.vx *= 0.95;
+          sp.vy = sp.vy * 0.95 + 0.08;
+          sp.alpha -= sp.decay;
+          if (sp.alpha <= 0) {
+            burstSparkles.splice(i, 1);
+            continue;
+          }
+          ctx.font = `${sp.size}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = sp.color + Math.min(1.0, sp.alpha) + ")";
+          ctx.fillText(sp.char, sp.x, sp.y);
+        }
+      }
+
       requestAnimationFrame(render);
     }
 
@@ -1359,6 +1622,9 @@
     const label = document.getElementById("bloom-val");
     const iconPlay = document.getElementById("icon-play");
     const iconPause = document.getElementById("icon-pause");
+    const checkRipple = document.getElementById("check-ripple");
+    const checkTheme = document.getElementById("check-theme");
+    const selectTheme = document.getElementById("select-theme");
 
     function updateIcons() {
       if (!iconPlay || !iconPause) return;
@@ -1404,11 +1670,44 @@
       updateIcons();
     };
 
-    // --- CLEAN MOBILE TOUCH INTERACTION ---
-    // Tap screen anywhere to restart if finished, or toggle play/pause
+    // --- DESKTOP RIPPLE & THEME CHECKBOX LISTENERS ---
+    if (checkRipple) {
+      checkRipple.addEventListener("change", (e) => {
+        rippleEnabled = e.target.checked;
+        if (!rippleEnabled) {
+          ripples.length = 0;
+          burstSparkles.length = 0;
+        }
+      });
+    }
+
+    if (checkTheme) {
+      checkTheme.addEventListener("change", (e) => {
+        const isChecked = e.target.checked;
+        if (selectTheme) {
+          selectTheme.style.display = isChecked ? "inline-block" : "none";
+        }
+        if (isChecked) {
+          applyTheme(selectTheme ? selectTheme.value : "cyber");
+        } else {
+          applyTheme("original");
+        }
+      });
+    }
+
+    if (selectTheme) {
+      selectTheme.addEventListener("change", (e) => {
+        if (checkTheme && checkTheme.checked) {
+          applyTheme(e.target.value);
+        }
+      });
+    }
+
+    // --- INTERACTIVE TOUCH & MOUSE EVENTS ---
     window.addEventListener("pointerdown", (e) => {
       if (e.target.closest && e.target.closest(".controls")) return;
       if (isPortrait) {
+        // Mobile clean interaction: tap screen to restart or toggle play/pause
         if (bloomProgress >= 0.95) {
           bloomProgress = 0.0;
           holdTimer = 0;
@@ -1416,6 +1715,20 @@
         } else {
           isPlaying = !isPlaying;
         }
+      } else {
+        // Desktop interaction: trigger water ripple & sparkling stardust burst
+        addRipple(e.clientX, e.clientY, true);
+      }
+    });
+
+    let lastTrailTime = 0;
+    window.addEventListener("pointermove", (e) => {
+      if (isPortrait || !rippleEnabled) return;
+      if (e.target.closest && e.target.closest(".controls")) return;
+      const now = performance.now();
+      if (now - lastTrailTime > 80) { // gentle trailing waves on mouse motion
+        lastTrailTime = now;
+        addRipple(e.clientX, e.clientY, false);
       }
     });
 
